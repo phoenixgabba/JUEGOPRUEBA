@@ -3,7 +3,11 @@ class_name CampState
 
 const SAVE_PATH := "user://acampada-day1-v2.json"
 var day := 1
+const DAY_TWO_ORDER := [4, 0, 1, 2, 3]
+const ACCESSIBILITY := 4
+const NETWORKS := 0
 var day_two_commissions := 0
+var day_two_completed := 0
 var media_count := 0
 var phase := "talk"
 var talked := {"Patricia": false, "Alejandro": false, "Marina": false}
@@ -25,6 +29,20 @@ var material_boxes := 0
 var choice := ""
 var player := Vector2(650, 495)
 var minutes := 0.0
+
+func has_day_two_commission(index: int) -> bool:
+	return (day_two_completed & (1 << index)) != 0
+
+func next_day_two_commission() -> int:
+	for index in DAY_TWO_ORDER:
+		if not has_day_two_commission(index):
+			return index
+	return -1
+
+func finish_day_two_commission(index: int) -> void:
+	if not has_day_two_commission(index):
+		day_two_completed |= 1 << index
+		day_two_commissions += 1
 
 func clock_hour() -> int:
 	if day == 2: return 22 if phase == "finished" else mini(21, 9 + floori((tents - 25) * 0.48))
@@ -55,7 +73,7 @@ func resources() -> int:
 func save_game() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null: return
-	f.store_string(JSON.stringify({"version":3,"day":day,"day_two_commissions":day_two_commissions,"media_count":media_count,"phase":phase,"talked":talked,"collected":collected,"build_stage":build_stage,"respect":respect,"energy":energy,"health":health,"wellbeing":wellbeing,"cash":cash,"people":people,"capacity":capacity,"tents":tents,"pitch_swaps":pitch_swaps,"commissions":commissions,"delivery":delivery,"delivery_progress":delivery_progress,"material_boxes":material_boxes,"choice":choice,"x":player.x,"y":player.y,"minutes":minutes}))
+	f.store_string(JSON.stringify({"version":4,"day_two_completed":day_two_completed,"day":day,"day_two_commissions":day_two_commissions,"media_count":media_count,"phase":phase,"talked":talked,"collected":collected,"build_stage":build_stage,"respect":respect,"energy":energy,"health":health,"wellbeing":wellbeing,"cash":cash,"people":people,"capacity":capacity,"tents":tents,"pitch_swaps":pitch_swaps,"commissions":commissions,"delivery":delivery,"delivery_progress":delivery_progress,"material_boxes":material_boxes,"choice":choice,"x":player.x,"y":player.y,"minutes":minutes}))
 	f.close()
 
 func load_game() -> bool:
@@ -63,9 +81,11 @@ func load_game() -> bool:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
 	if f == null: return false
 	var d = JSON.parse_string(f.get_as_text())
-	if not d is Dictionary or int(d.get("version", 0)) not in [1, 2, 3]: return false
+	if not d is Dictionary or int(d.get("version", 0)) not in [1, 2, 3, 4]: return false
 	day = clampi(int(d.get("day", 1)), 1, 2)
 	day_two_commissions = clampi(int(d.get("day_two_commissions", 0)), 0, 5)
+	# Earlier Day 2 saves opened Redes through Accesibilidad in index order.
+	day_two_completed = clampi(int(d.get("day_two_completed", (1 << day_two_commissions) - 1)), 0, 31)
 	media_count = clampi(int(d.get("media_count", 0)), 0, 3)
 	phase = str(d.get("phase", "talk"))
 	var previous: Dictionary = d.get("talked", {})

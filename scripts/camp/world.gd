@@ -207,7 +207,7 @@ func draw_pitch(c: Control, p: Vector2, index: int) -> void:
 	c.draw_texture_rect(TENT, Rect2(p - TENT_OFFSET, TENT_SIZE), false, CAMP_TINTS[index % CAMP_TINTS.size()])
 
 func npc_pos(n: String, s: CampState, t: float) -> Vector2:
-	if n == "Patricia" and s.day == 2 and s.phase == "commissions_two" and s.day_two_commissions == 0 and s.media_count == 0:
+	if n == "Patricia" and s.day == 2 and s.phase == "commissions_two" and s.next_day_two_commission() == CampState.NETWORKS and s.media_count == 0:
 		return DayTwo.MEDIA_POINTS[0]
 	if s.phase in ["commissions", "expansion", "finished"]:
 		return clear_spot(ORGANIZATION + Vector2(-22 + ["Patricia", "Alejandro", "Marina"].find(n) * 22, -14), s)
@@ -269,7 +269,8 @@ func draw(c: Control, s: CampState, rect: Rect2, t: float, walking: bool, arriva
 			var pitch := pitch_at(s, i)
 			c.draw_rect(Rect2(pitch - TENT_GROUND, TENT_GROUND * 2.0), Color("ffed9c"), false, 1.0)
 	# Characters are ordered by their feet, so overlapping still feels spatial.
-	for i in range(s.day_two_commissions):
+	for i in range(DayTwo.NAMES.size()):
+		if not s.has_day_two_commission(i): continue
 		var point: Vector2 = DayTwo.POINTS[i]
 		c.draw_circle(point, 8, Color("36594b"))
 		c.draw_arc(point, 8, 0, TAU, 20, Color("eed29b"), 1.5)
@@ -338,7 +339,8 @@ func map_locations(s: CampState, t: float) -> Array[Dictionary]:
 		locations.append({"label":"Almacén", "pos":SITE, "kind":"built"})
 	for i in range(s.commissions):
 		locations.append({"label":COMMISSION_NAMES[i], "pos":COMMISSION_POINTS[i], "kind":"built"})
-	for i in range(s.day_two_commissions):
+	for i in range(DayTwo.NAMES.size()):
+		if not s.has_day_two_commission(i): continue
 		locations.append({"label":DayTwo.NAMES[i], "pos":DayTwo.POINTS[i], "kind":"built"})
 	locations.append_array(objective_locations(s, t))
 	return locations
@@ -350,10 +352,10 @@ func objective_locations(s: CampState, t: float) -> Array[Dictionary]:
 			if s.day == 1: items.append({"label":"Empezar Día 2", "pos":ORGANIZATION, "kind":"goal"})
 		"meeting_two": items.append({"label":"Segunda asamblea", "pos":MEETING, "kind":"goal"})
 		"commissions_two":
-			if s.day_two_commissions == 0 and s.media_count < DayTwo.MEDIA_POINTS.size():
+			if s.next_day_two_commission() == CampState.NETWORKS and s.media_count < DayTwo.MEDIA_POINTS.size():
 				items.append({"label":DayTwo.MEDIA[s.media_count], "pos":DayTwo.MEDIA_POINTS[s.media_count], "kind":"goal"})
 			else:
-				items.append({"label":DayTwo.NAMES[s.day_two_commissions], "pos":DayTwo.POINTS[s.day_two_commissions], "kind":"goal"})
+				items.append({"label":DayTwo.NAMES[s.next_day_two_commission()], "pos":DayTwo.POINTS[s.next_day_two_commission()], "kind":"goal"})
 		"talk":
 			for name in ["Patricia", "Alejandro", "Marina"]:
 				if not s.talked[name]:

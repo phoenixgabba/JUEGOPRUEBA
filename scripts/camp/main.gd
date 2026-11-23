@@ -168,10 +168,10 @@ func advance_expansion() -> void:
 		if s.day_two_commissions < 5 and s.tents >= 25 + 5 * s.day_two_commissions:
 			s.phase = "commissions_two"
 			s.delivery = ""
-			announce("Siguiente comisión: " + DayTwo.NAMES[s.day_two_commissions] + ".")
+			announce("Siguiente comisión: " + DayTwo.NAMES[s.next_day_two_commission()] + ".")
 		elif s.tents >= World.DAY_TWO_TENTS:
 			s.delivery = "close"
-		elif s.day_two_commissions >= 5:
+		elif s.has_day_two_commission(State.ACCESSIBILITY):
 			s.delivery = "delegated"
 		else:
 			s.delivery = "offer"
@@ -229,11 +229,11 @@ func interact_day_two() -> bool:
 	if s.phase == "meeting_two" and s.player.distance_to(World.MEETING) < 75:
 		s.phase = "commissions_two"
 		s.save_game()
-		open_dialog("SEGUNDA ASAMBLEA", "Hoy necesitamos Redes para compartir avisos, Seguridad para cuidar la plaza, Convivencia para conflictos internos, un Punto sanitario y Accesibilidad. Abrimos Redes primero y después recibimos más tiendas.")
+		open_dialog("SEGUNDA ASAMBLEA", "Hoy necesitamos Redes para compartir avisos, Seguridad para cuidar la plaza, Convivencia para conflictos internos, un Punto sanitario y Accesibilidad. Abrimos Accesibilidad primero para que pueda recibir y alojar a quienes lleguen.")
 		return true
 	if s.phase != "commissions_two":
 		return false
-	var index := s.day_two_commissions
+	var index := s.next_day_two_commission()
 	if index == 0 and s.media_count < DayTwo.MEDIA.size():
 		if s.player.distance_to(DayTwo.MEDIA_POINTS[s.media_count]) > 48: return false
 		var capture: String = DayTwo.MEDIA[s.media_count]
@@ -249,8 +249,8 @@ func interact_day_two() -> bool:
 func complete_day_two_activity() -> void:
 	commission_open = false
 	day_two_open = false
-	var index := s.day_two_commissions
-	s.day_two_commissions += 1
+	var index := s.next_day_two_commission()
+	s.finish_day_two_commission(index)
 	advance_expansion()
 	s.save_game()
 	var messages := [
@@ -263,7 +263,7 @@ func complete_day_two_activity() -> void:
 	open_dialog(DayTwo.NAMES[index].to_upper(), messages[index])
 
 func open_phone() -> void:
-	if s.day_two_commissions == 0 or dialogue:
+	if not s.has_day_two_commission(State.NETWORKS) or dialogue:
 		return
 	open_dialog("TELÉFONO · REDES", "@acampadavalencia · Perfil simulado. Publicaciones: " + ", ".join(DayTwo.MEDIA) + ".")
 
@@ -496,9 +496,9 @@ func objective() -> String:
 	match s.phase:
 		"meeting_two": return "Ve al círculo central para la segunda asamblea."
 		"commissions_two":
-			if s.day_two_commissions == 0 and s.media_count < DayTwo.MEDIA.size():
+			if s.next_day_two_commission() == State.NETWORKS and s.media_count < DayTwo.MEDIA.size():
 				return "Redes · Captura: " + DayTwo.MEDIA[s.media_count]
-			return "Abre la comisión de " + DayTwo.NAMES[s.day_two_commissions]
+			return "Abre la comisión de " + DayTwo.NAMES[s.next_day_two_commission()]
 		"talk": return "Conoce a Patricia, Alejandro y Marina  ·  %d/3" % [int(s.talked.Patricia) + int(s.talked.Alejandro) + int(s.talked.Marina)]
 		"meeting": return "Ve al círculo central y participa en la primera asamblea."
 		"materials": return "Recoge lona, varillas y piquetas  ·  %d/3" % s.resources()
@@ -668,7 +668,7 @@ func draw_hud() -> void:
 		text(Vector2(32,62), "DÍA %d · %s · %02d:00" % [s.day, s.daylight(), s.clock_hour()], 13, Color("fff3d9"), true)
 		text(Vector2(225,51), "VIDA %d    ENERGÍA %d    RESPETO %d    CAJA %d €    RECURSOS %d    BIENESTAR %d    PERSONAS %d" % [s.health,s.energy,s.respect,s.cash,s.resources(),s.wellbeing,s.people], 16, Color("fff6e2"), true)
 		button(Rect2(size_v.x-105,23,76,42), "Ⅱ", "pause")
-		if s.day_two_commissions > 0: button(Rect2(20,88,130,50), "Teléfono", "phone")
+		if s.has_day_two_commission(State.NETWORKS): button(Rect2(20,88,130,50), "Teléfono", "phone")
 		panel(Rect2(size_v.x-327,94,305,94), Color(0.12,0.23,0.19,0.91))
 		text(Vector2(size_v.x-309,121), "AHORA EN LA PLAZA", 13, Color("eac379"), true)
 		paragraph(Vector2(size_v.x-309,145), objective(), 268, 16)
@@ -772,7 +772,7 @@ func draw_mobile_controls(row: Rect2, enabled: bool) -> void:
 	var h := joystick_radius - gap * 0.5
 	var x := row.end.x - right_width
 	button(Rect2(x,top,right_width,h), "Mapa", "map", false, fs)
-	if s.day_two_commissions > 0 and enabled:
+	if s.has_day_two_commission(State.NETWORKS) and enabled:
 		button(Rect2(x-right_width-gap,top,right_width,h), "Teléfono", "phone", false, roundi(fs * 0.9))
 	button(Rect2(x,top+h+gap,right_width,h), "Acción", "action", enabled, fs)
 	if not enabled:

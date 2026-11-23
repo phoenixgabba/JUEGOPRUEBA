@@ -15,12 +15,15 @@ func run() -> void:
 	assert(main.interact_day_two())
 	main.close_dialog()
 	var day_two = main.DayTwo
-	for i in range(3):
-		main.s.player = day_two.MEDIA_POINTS[i]
-		assert(main.interact_day_two())
-		main.close_dialog()
-	for i in range(5):
+	for turn in range(CampState.DAY_TWO_ORDER.size()):
+		var i: int = CampState.DAY_TWO_ORDER[turn]
 		assert(main.s.phase == "commissions_two")
+		assert(main.s.next_day_two_commission() == i)
+		if i == CampState.NETWORKS:
+			for capture in range(3):
+				main.s.player = day_two.MEDIA_POINTS[capture]
+				assert(main.interact_day_two())
+				main.close_dialog()
 		main.s.player = day_two.POINTS[i]
 		assert(main.interact_day_two())
 		var activity = main.day_two_activity
@@ -43,19 +46,16 @@ func run() -> void:
 					activity.action(move)
 		assert(activity.done)
 		main._process(0.01)
-		assert(main.s.day_two_commissions == i + 1)
+		assert(main.s.day_two_commissions == turn + 1)
 		main.close_dialog()
 		for j in range(5):
 			var next := CampWorld.next_pitch(main.s)
 			assert(CampWorld.walkable(next, main.s), "Parcela inaccesible: %s" % next)
-			if i == 4:
-				assert(main.s.delivery == "delegated")
-				main.update_deliveries(6.1)
-			else:
-				main.install_tent(false)
+			assert(main.s.delivery == "delegated")
+			main.update_deliveries(6.1)
 	assert(main.s.tents == 50 and main.s.delivery == "close")
 	main.s.save_game()
 	var restored := CampState.new()
-	assert(restored.load_game() and restored.day == 2 and restored.tents == 50 and restored.day_two_commissions == 5 and restored.media_count == 3)
+	assert(restored.load_game() and restored.day == 2 and restored.tents == 50 and restored.day_two_commissions == 5 and restored.media_count == 3 and restored.day_two_completed == 31)
 	print("[day-two] PASS: 5 minijuegos, 25 tiendas nuevas, entrega automática y guardado")
 	quit()
