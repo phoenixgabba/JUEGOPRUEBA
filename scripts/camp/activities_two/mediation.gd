@@ -1,6 +1,15 @@
 extends "res://scripts/camp/activities_two/session.gd"
 
 const ITEMS := ["Tienda","Mesa","Lona","Piquetas","Varillas","Manta","Cantimplora","Mochila","Megáfono","Linterna"]
+const ICONS := [
+	preload("res://assets/art_v2/tent.png"), preload("res://assets/art_v2/table.png"),
+	preload("res://assets/art_v2/tarp.png"), preload("res://assets/art_v2/pegs.png"),
+	preload("res://assets/art_v2/poles.png"), preload("res://assets/art_v2/blanket.png"),
+	preload("res://assets/art_v2/canteen.png"), preload("res://assets/art_v2/backpack.png"),
+	preload("res://assets/art_v2/megaphone.png"), preload("res://assets/art_v2/flashlight.png")
+]
+const FACE := preload("res://assets/art_v2/card_face.png")
+const BACK := preload("res://assets/art_v2/card_back.png")
 const GRID := Vector2(20,88)
 const AREA := Vector2(400,311)
 var deck: Array[int] = []
@@ -74,10 +83,11 @@ func perform(value: String) -> void:
 		feedback("Prueba con otra pareja.", card_rect(index).get_center(),true)
 
 func card_rect(index: int) -> Rect2:
-	var columns := 5 if deck.size()>12 else 4
+	var columns := 2 if deck.size()==4 else (5 if deck.size()>12 else 4)
 	var rows := ceili(float(deck.size())/columns)
 	var tile := AREA/Vector2(columns,rows)
-	return Rect2(GRID+Vector2(index%columns,index/columns)*tile+Vector2(3,4),tile-Vector2(6,8))
+	var card_size := Vector2(minf(tile.x-8,(tile.y-8)*0.76),tile.y-8)
+	return Rect2(GRID+Vector2(index%columns,floori(float(index)/columns))*tile+(tile-card_size)/2,card_size)
 
 func status() -> String:
 	return "Tablero %d/3  •  %d parejas  •  %d intentos  •  %.1fs"%[mini(stage+1,3),pairs,attempts,active_time]
@@ -93,17 +103,17 @@ func scene(game: Control) -> void:
 			flip = maxf(0.05,absf(1-2*progress))
 			if progress<0.5: facing = not turnover[i].face
 		var display := Rect2(r.get_center()-Vector2(r.size.x*flip,r.size.y)/2,Vector2(r.size.x*flip,r.size.y))
-		game.draw_texture_rect(preload("res://assets/art_v2/card_face.png") if facing else preload("res://assets/art_v2/card_back.png"), display, false)
+		game.draw_rect(Rect2(display.position+Vector2(2,4),display.size),Color(0,0,0,0.40))
+		game.draw_texture_rect(FACE if facing else BACK, display, false)
 		if matched.has(i): game.draw_rect(display.grow(-2), GOLD, false, 2)
 		if flip>0.63:
 			if facing:
-				draw_item(game,deck[i],display.get_center()-Vector2(0,7))
+				draw_item(game,deck[i],display.get_center()-Vector2(0,7),display.size)
 				game.text(display.position+Vector2(0,display.size.y-8),ITEMS[deck[i]],11,INK,true,display.size.x,HORIZONTAL_ALIGNMENT_CENTER)
 		hit(game,r,"card:%d"%i)
 
-func draw_item(game: Control, id: int, p: Vector2) -> void:
-	var names := ["tent", "table", "tarp", "pegs", "poles", "blanket", "canteen", "backpack", "megaphone", "flashlight"]
-	var tex := load("res://assets/art_v2/%s.png" % names[id]) as Texture2D
-	if tex == null: return
-	var scale_factor := minf(49.0 / tex.get_width(), 39.0 / tex.get_height())
-	item(game, tex, p, tex.get_size() * scale_factor)
+func draw_item(game: Control, id: int, p: Vector2, card_size: Vector2) -> void:
+	var tex: Texture2D = ICONS[id]
+	var bounds := Vector2(card_size.x-12,card_size.y-23)
+	var factor := minf(bounds.x/float(tex.get_width()),bounds.y/float(tex.get_height()))
+	item(game,tex,p,Vector2(tex.get_size())*factor)
