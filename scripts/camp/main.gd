@@ -589,22 +589,22 @@ func talk_to(n: String) -> void:
 
 func crowd_dialogue(n: String) -> String:
 	var dialogues := {
-		"Núria": ["He venido a escuchar. ¿Dónde será la asamblea?","Estoy anotando los acuerdos para que nadie se quede sin información.","Podemos revisar el acta de ayer y repartir las tareas de hoy."],
+		"Tomi": ["He venido a escuchar. ¿Dónde será la asamblea?","Estoy anotando los acuerdos para que nadie se quede sin información.","Podemos revisar el acta de ayer y repartir las tareas de hoy."],
 		"Vicent": ["Traigo una silla plegable. No aguanto mucho tiempo de pie.","Me alegra que estén despejando los pasos entre tiendas.","Hoy buscaré un lugar tranquilo donde sentarme."],
 		"Amina": ["Puedo ayudar a traducir los avisos si hace falta.","Estoy pendiente de que las instrucciones se entiendan bien.","Podríamos preparar carteles en varios idiomas."],
 		"Pau": ["Tengo herramientas en casa. Puedo traerlas.","Si faltan varillas, preguntad en el almacén.","Voy a revisar el material antes de los relevos."],
-		"Laia": ["He venido con mi familia. Quiero ayudar a repartir agua.","Me han enseñado dónde está el punto de Cocina.","Hoy puedo echar una mano con los carteles."],
-		"Samir": ["Me gustaría conocer a la gente antes de decidir qué hacer.","Estoy ayudando a orientar a las personas que llegan.","Hoy quiero participar en el turno de acogida."],
+		"Cleo": ["He venido con mi familia. Quiero ayudar a repartir agua.","Me han enseñado dónde está el punto de Cocina.","Hoy puedo echar una mano con los carteles."],
+		"Julian": ["Me gustaría conocer a la gente antes de decidir qué hacer.","Estoy ayudando a orientar a las personas que llegan.","Hoy quiero participar en el turno de acogida."],
 		"Rosa": ["He traído unas mantas. ¿Dónde puedo dejarlas?","Hace frío por la noche. Guardemos algunas para quien las necesite.","Voy a preguntar si quedan mantas secas."],
 		"Marc": ["¿Puedo ayudar a montar las tiendas?","Estoy aprendiendo a colocar las piquetas.","Ya sé montar una tienda sin bloquear el paso."],
-		"Irene": ["Me gustaría preparar algo de comida para compartir.","Estoy organizando el agua y los alimentos.","Vamos a comprobar qué queda en la despensa."],
+		"Carles": ["Me gustaría preparar algo de comida para compartir.","Estoy organizando el agua y los alimentos.","Vamos a comprobar qué queda en la despensa."],
 		"Hugo": ["He traído una libreta para recoger ideas.","Estoy apuntando las propuestas de la gente.","Quiero dejar por escrito lo que acordamos ayer."],
-		"Fátima": ["Hay personas que aún no saben dónde reunirse.","Estoy ayudando a explicar cómo funcionan las comisiones.","Podemos mejorar la información para las nuevas llegadas."],
-		"Júlia": ["He venido con mi madre y quiero conocer la plaza.","Me gusta ver cómo aparecen las tiendas.","Hoy quiero ayudar a dibujar señales."],
+		"Anna": ["Hay personas que aún no saben dónde reunirse.","Estoy ayudando a explicar cómo funcionan las comisiones.","Podemos mejorar la información para las nuevas llegadas."],
+		"Irene": ["He venido con mi madre y quiero conocer la plaza.","Me gusta ver cómo aparecen las tiendas.","Hoy quiero ayudar a dibujar señales."],
 		"Óscar": ["Puedo colaborar con los turnos de limpieza.","Estoy recogiendo lo que queda en los pasillos.","Voy a revisar los puntos de recogida."],
-		"Carmen": ["Necesito descansar de vez en cuando, pero puedo ayudar sentada.","Un banco libre y un paso ancho hacen mucha diferencia.","Hoy procuraré que haya sitio para sentarse."],
-		"Dani": ["Tengo algo de experiencia haciendo carteles.","Estoy preparando materiales para Comunicación.","Podemos actualizar los avisos de la plaza."],
-		"Berta": ["¿Hay algún espacio para compartir libros?","Estoy buscando un rincón para actividades tranquilas.","Me gustaría organizar una lectura compartida."],
+		"Lulu": ["Necesito descansar de vez en cuando, pero puedo ayudar desde un banco.","Un banco libre y un paso ancho hacen mucha diferencia.","Hoy procuraré que haya sitio para sentarse."],
+		"Dan": ["Tengo algo de experiencia haciendo carteles.","Estoy preparando materiales para Comunicación.","Podemos actualizar los avisos de la plaza."],
+		"David": ["¿Hay algún espacio para compartir libros?","Estoy buscando un rincón para actividades tranquilas.","Me gustaría organizar una lectura compartida."],
 		"Àlex": ["Quiero saber cómo podemos repartir las tareas.","Estoy buscando un relevo para quienes llevan horas trabajando.","Hoy intentaré que nadie tenga que hacer dos turnos seguidos."]
 	}
 	var variants: Array = dialogues[n]
