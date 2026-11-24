@@ -46,10 +46,11 @@ var activity_sound := AudioStreamPlayer.new()
 var activity_sounds: Dictionary = {}
 var rest_time := -1.0
 var test_build := false
-var selector_page := 0
+var selector_day := -1
+var selector_offset := 0
 const CHECKPOINT_LABELS := ["Cierre del Día 1", "Regreso a tu tienda", "Entrar y descansar", "Amanecer", "Segunda asamblea", "Redes", "Seguridad", "Convivencia", "Punto sanitario", "Accesibilidad", "Montaje de tienda", "Almacén", "Cocina", "Teléfono y aplicaciones", "Inicio · conocer a la gente", "Primera asamblea", "Recoger materiales", "Primera llegada de tiendas", "Asignar una parcela", "Organización", "Comunicación", "Cierre del Día 2", "Regreso a tu tienda · Día 2", "Entrar y descansar · Día 2", "Amanecer · Día 3", "Explorar Día 3", "Montar tienda donada", "Llegadas finales · Día 1"]
-const CHECKPOINT_PAGES := [[14,15,16,10,17,18,11,19],[12,26,20,27,0,1,2,3],[4,5,6,7,8,9,13],[21,22,23,24,25]]
-const CHECKPOINT_TABS := ["D1 · Inicio","D1 · Comisiones","D2 · Comisiones","D2 · Cierre"]
+const CHECKPOINT_DAYS := [[14,15,16,10,17,18,11,19,12,26,20,27,0,1,2],[3,4,5,13,6,7,8,9,21,22,23],[24,25]]
+const CHECKPOINT_DAY_NAMES := ["Día 1 · Primeras tiendas","Día 2 · Nuevas comisiones","Día 3 · Amanecer"]
 var evening_shade := 0.0
 var save_timer := 0.0
 var walking := false
@@ -1272,8 +1273,14 @@ func pointer_down(pos: Vector2, index: int) -> void:
 				"mini_action": mini_action()
 				"mini_close": mini = false
 				_:
-					if id.begins_with("checkpoint_page:") and test_build:
-						selector_page = clampi(int(id.get_slice(":",1)),0,CHECKPOINT_PAGES.size()-1)
+					if id.begins_with("checkpoint_day:") and test_build:
+						var day_index := int(id.get_slice(":",1))
+						selector_day = -1 if selector_day == day_index else day_index
+						selector_offset = 0
+					elif id == "checkpoint_prev" and test_build:
+						selector_offset = maxi(0,selector_offset-1)
+					elif id == "checkpoint_next" and test_build:
+						selector_offset += 1
 					elif id.begins_with("checkpoint:") and test_build:
 						load_checkpoint(int(id.get_slice(":", 1)))
 					elif id.begins_with("peg"):
@@ -1291,22 +1298,42 @@ func pointer_up(_pos: Vector2, index: int) -> void:
 
 
 func draw_selector() -> void:
-	draw_texture_rect(COVER, Rect2(Vector2.ZERO,size_v),false)
-	var ids: Array = CHECKPOINT_PAGES[selector_page]
+	draw_texture_rect(COVER,Rect2(Vector2.ZERO,size_v),false)
 	var cols := 2 if size_v.x > size_v.y else 1
-	var layout := Vector2(430*cols+20,146+ceili(float(ids.size())/cols)*58)
+	var page_size := 6*cols
+	var count := 0
+	if selector_day >= 0 and selector_day < CHECKPOINT_DAYS.size():
+		count = CHECKPOINT_DAYS[selector_day].size()
+	var pages := maxi(1,ceili(float(count)/page_size))
+	selector_offset = clampi(selector_offset,0,pages-1)
+	var visible := mini(page_size,maxi(0,count-selector_offset*page_size))
+	var rows := ceili(float(visible)/cols)
+	var layout := Vector2(430*cols+20,86+CHECKPOINT_DAYS.size()*56+rows*56+(48 if pages>1 else 0))
 	mini_scale = minf((size_v.x-20)/layout.x,(size_v.y-20)/layout.y)
 	mini_rect = Rect2((size_v-layout*mini_scale)/2,layout*mini_scale)
 	draw_set_transform(mini_rect.position,0,Vector2.ONE*mini_scale)
 	drawing_mini = true
 	panel(Rect2(Vector2.ZERO,layout))
 	text(Vector2(24,40),"Saltar a un punto de prueba",29,Color("fff5df"),true)
-	var tab_width := (layout.x-40)/2
-	for i in range(CHECKPOINT_TABS.size()):
-		button(Rect2(20+(i%2)*tab_width,51+floori(float(i)/2)*43,tab_width-4,39),CHECKPOINT_TABS[i],"checkpoint_page:%d"%i,i==selector_page,17)
-	for i in range(ids.size()):
-		var id: int = ids[i]
-		button(Rect2(20+(i%cols)*430,142+floori(float(i)/cols)*58,410,51),CHECKPOINT_LABELS[id],"checkpoint:%d"%id,false,22)
+	var y := 60.0
+	for day_index in range(CHECKPOINT_DAYS.size()):
+		var expanded := day_index == selector_day
+		var ids: Array = CHECKPOINT_DAYS[day_index]
+		var caption := ("%s  " % ("−" if expanded else "+"))+str(CHECKPOINT_DAY_NAMES[day_index])+"  ·  %d"%ids.size()
+		button(Rect2(20,y,layout.x-40,49),caption,"checkpoint_day:%d"%day_index,expanded,20)
+		y += 56
+		if not expanded: continue
+		for i in range(visible):
+			var order := selector_offset*page_size+i
+			var id: int = ids[order]
+			var label := "%02d. %s"%[order+1,CHECKPOINT_LABELS[id]]
+			button(Rect2(20+(i%cols)*430,y+floori(float(i)/cols)*56,410,49),label,"checkpoint:%d"%id,false,18)
+		y += rows*56
+		if pages > 1:
+			if selector_offset>0: button(Rect2(20,y,105,40),"Anterior","checkpoint_prev",false,15)
+			text(Vector2(125,y+25),"%d / %d"%[selector_offset+1,pages],16,Color("fff5df"),true,layout.x-250,HORIZONTAL_ALIGNMENT_CENTER)
+			if selector_offset<pages-1: button(Rect2(layout.x-125,y,105,40),"Siguiente","checkpoint_next",false,15)
+			y += 48
 	drawing_mini = false
 	draw_set_transform(Vector2.ZERO)
 
