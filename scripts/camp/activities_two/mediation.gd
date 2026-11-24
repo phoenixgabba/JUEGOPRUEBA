@@ -17,7 +17,7 @@ var pairs := 0
 func initialize(seed_value: int, plan: String) -> void:
 	super.initialize(seed_value,plan)
 	title = "Convivencia · parejas de la plaza"
-	help = "Encuentra una pareja de prueba y después completa los tableros con iconos de la acampada."
+	help = "Voltea dos cartas de ensayo y encuentra una pareja. Luego comienza el tablero puntuado."
 	deal(2)
 
 func deal(count: int) -> void:
@@ -93,60 +93,17 @@ func scene(game: Control) -> void:
 			flip = maxf(0.05,absf(1-2*progress))
 			if progress<0.5: facing = not turnover[i].face
 		var display := Rect2(r.get_center()-Vector2(r.size.x*flip,r.size.y)/2,Vector2(r.size.x*flip,r.size.y))
-		var front := Color("efe2bc")
-		var back := Color("254640")
-		game.draw_rect(display,front if facing else back)
-		game.draw_rect(display,GOLD if matched.has(i) else CREAM,false,2)
+		game.draw_texture_rect(preload("res://assets/art_v2/card_face.png") if facing else preload("res://assets/art_v2/card_back.png"), display, false)
+		if matched.has(i): game.draw_rect(display.grow(-2), GOLD, false, 2)
 		if flip>0.63:
 			if facing:
-				game.draw_rect(display.grow(-8),Color("f7edd0"))
-				draw_item(game,deck[i],display.get_center()-Vector2(0,10))
+				draw_item(game,deck[i],display.get_center()-Vector2(0,7))
 				game.text(display.position+Vector2(0,display.size.y-8),ITEMS[deck[i]],11,INK,true,display.size.x,HORIZONTAL_ALIGNMENT_CENTER)
-			else:
-				var center := display.get_center()
-				game.draw_rect(display.grow(-6),Color("2f5a52"),false,1)
-				game.draw_circle(center,18,GOLD)
-				game.draw_circle(center,12,back)
-				game.draw_line(center+Vector2(-9,0),center+Vector2(9,0),GOLD,2)
-				game.draw_line(center+Vector2(0,-9),center+Vector2(0,9),GOLD,2)
 		hit(game,r,"card:%d"%i)
 
 func draw_item(game: Control, id: int, p: Vector2) -> void:
-	game.draw_circle(p,22,Color("d7c793"))
-	match id:
-		0:
-			game.draw_colored_polygon(PackedVector2Array([p+Vector2(0,-16),p+Vector2(14,10),p+Vector2(-14,10)]),Color("5b7f65"))
-			game.draw_rect(Rect2(p+Vector2(-12,10),Vector2(24,5)),Color("355440"))
-		1:
-			game.draw_rect(Rect2(p+Vector2(-16,-10),Vector2(32,8)),Color("a36d45"))
-			game.draw_line(p+Vector2(-12,-2),p+Vector2(-15,13),INK,2)
-			game.draw_line(p+Vector2(12,-2),p+Vector2(15,13),INK,2)
-		2:
-			game.draw_rect(Rect2(p+Vector2(-15,-11),Vector2(30,22)),Color("6289a3"))
-			game.draw_line(p+Vector2(-13,-11),p+Vector2(0,-18),Color("d8e4ef"),2)
-			game.draw_line(p+Vector2(13,-11),p+Vector2(0,-18),Color("d8e4ef"),2)
-		3:
-			for offset in [-8,0,8]:
-				game.draw_line(p+Vector2(offset,-12),p+Vector2(offset-3,11),Color("d0a76f"),3)
-			game.draw_line(p+Vector2(-12,11),p+Vector2(12,11),Color("d0a76f"),3)
-		4:
-			for offset in [-10,-3,4,11]:
-				game.draw_line(p+Vector2(offset,-12),p+Vector2(offset,12),Color("8f7f63"),3)
-			game.draw_line(p+Vector2(-12,12),p+Vector2(12,12),INK,2)
-		5:
-			game.draw_rect(Rect2(p+Vector2(-16,-12),Vector2(32,24)),Color("b65d59"))
-			for i in range(3): game.draw_line(p+Vector2(-13,-6+i*7),p+Vector2(13,-6+i*7),Color("f0dcb1"),2)
-		6:
-			game.draw_rect(Rect2(p+Vector2(-9,-12),Vector2(18,26)),Color("477b9b"))
-			game.draw_rect(Rect2(p+Vector2(-5,-17),Vector2(10,6)),INK)
-			game.draw_rect(Rect2(p+Vector2(-7,0),Vector2(14,8)),Color("d1edf8"))
-		7:
-			game.draw_rect(Rect2(p+Vector2(-15,-11),Vector2(30,23)),Color("a36d45"))
-			game.draw_rect(Rect2(p+Vector2(-9,-17),Vector2(18,8)),INK)
-			game.draw_rect(Rect2(p+Vector2(-11,-1),Vector2(22,9)),Color("f3d383"))
-		8:
-			game.draw_colored_polygon(PackedVector2Array([p+Vector2(-15,-6),p+Vector2(13,-15),p+Vector2(13,9),p+Vector2(-15,2)]),Color("7865a0"))
-			game.draw_rect(Rect2(p+Vector2(-8,-2),Vector2(8,10)),INK)
-		9:
-			game.draw_rect(Rect2(p+Vector2(-8,-10),Vector2(16,24)),Color("514d64"))
-			game.draw_rect(Rect2(p+Vector2(-11,13),Vector2(22,7)),GOLD)
+	var names := ["tent", "table", "tarp", "pegs", "poles", "blanket", "canteen", "backpack", "megaphone", "flashlight"]
+	var tex := load("res://assets/art_v2/%s.png" % names[id]) as Texture2D
+	if tex == null: return
+	var scale_factor := minf(49.0 / tex.get_width(), 39.0 / tex.get_height())
+	item(game, tex, p, tex.get_size() * scale_factor)

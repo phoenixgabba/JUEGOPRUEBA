@@ -1,12 +1,15 @@
 extends "res://scripts/camp/activities_two/session.gd"
 
+const PAVING := preload("res://assets/visual/paving.png")
+const BLOCKED_ART := preload("res://assets/visual/blocked.png")
+const CRATE_ART := preload("res://assets/visual/crate.png")
+
 const BOARD := Rect2(20,90,400,310)
 const JOY := Vector2(91,552)
 const DIRS := [Vector2i(1,0),Vector2i(0,1),Vector2i(-1,0),Vector2i(0,-1)]
 var field := Rect2i()
 var open_cells := {}
 var narrow := {}
-var explored := {}
 var player := Vector2i.ZERO
 var guest := Vector2i.ZERO
 var destination := Vector2i.ZERO
@@ -26,7 +29,7 @@ var guest_delay := 0.0
 func initialize(seed_value: int, plan: String) -> void:
 	super.initialize(seed_value,plan)
 	title = "Accesibilidad · hacia tu tienda"
-	help = "El recorrido ahora se descubre al avanzar. Guía a la persona sin perderla ni meterte en pasos estrechos imposibles para ella."
+	help = "Mueve el joystick o usa WASD y las flechas. Guía a la persona hasta la tienda dorada. Las cajas estrechas solo te dejan pasar a ti."
 	generate()
 	optimal = 0
 
@@ -36,7 +39,6 @@ func generate() -> void:
 	field = Rect2i(0,0,width,height)
 	open_cells.clear()
 	narrow.clear()
-	explored.clear()
 	player = Vector2i(1,1)
 	guest = player
 	destination = Vector2i(width-2,height-2)
@@ -72,16 +74,7 @@ func generate() -> void:
 	guest_motion = 0
 	guest_delay = 0
 	waiting = false
-	reveal_around(player)
-	reveal_around(guest)
-	optimal += maxi(0, find_route(guest,destination,false).size()-1)
-
-func reveal_around(tile: Vector2i) -> void:
-	for y in range(tile.y-2, tile.y+3):
-		for x in range(tile.x-2, tile.x+3):
-			var cell := Vector2i(x,y)
-			if field.has_point(cell) and cell.distance_to(tile) <= 2.45:
-				explored[cell] = true
+	optimal += find_route(guest,destination,false).size()-1
 
 func walkable(tile: Vector2i, player_only: bool) -> bool:
 	return open_cells.has(tile) or (player_only and narrow.has(tile))
@@ -152,25 +145,23 @@ func tick(delta: float) -> void:
 				from_player = player
 				player = next
 				player_motion = speed
-				reveal_around(player)
 				steps += int(not tutorial)
 				if tutorial:
 					trained()
 					optimal = find_route(guest,destination,false).size()-1
-					feedback("Descubre el trazado poco a poco. Mantén cerca a tu acompañante.")
+					feedback("Ve despacio. Tu acompañante necesita un paso ancho.")
 	if guest_motion>0 or guest_delay>0: return
 	var route := find_route(guest,player,false)
 	var stopped := route.is_empty() or route.size()>9
 	if stopped and not waiting:
 		separated += 1
-		feedback("Te has separado demasiado. Vuelve por un paso ancho.")
+		feedback("Tu acompañante espera. Vuelve por un paso ancho.")
 	waiting = stopped
 	if not waiting and (route.size()>2 or (player==destination and route.size()>1)):
 		from_guest = guest
 		guest = route[1]
 		guest_motion = 0.18
 		guest_delay = 0.20
-		reveal_around(guest)
 	elif guest==destination and player==destination:
 		advance_board()
 
@@ -181,7 +172,7 @@ func advance_board() -> void:
 			"Tres acompañamientos · %d pasos · %d separaciones · %.1f s."%[steps,separated,active_time])
 	else:
 		generate()
-		feedback("Llegasteis juntos. La siguiente zona tiene más cruces y menos visibilidad.")
+		feedback("Llegasteis juntos. La siguiente zona tiene más cruces.")
 
 func center(tile: Vector2i) -> Vector2:
 	var unit := minf(BOARD.size.x/field.size.x,BOARD.size.y/field.size.y)
@@ -198,23 +189,19 @@ func scene(game: Control) -> void:
 			var tile := Vector2i(x,y)
 			var p := center(tile)
 			var r := Rect2(p-Vector2.ONE*unit/2,Vector2.ONE*unit)
-			if not explored.has(tile):
-				game.draw_rect(r,Color("22322e"))
-				continue
 			if open_cells.has(tile):
-				game.draw_rect(r,Color("d0bd96") if (x+y)%2==0 else Color("cbb58b"))
+				game.draw_texture_rect(PAVING,r,false)
 			elif narrow.has(tile):
-				game.draw_rect(r,Color("d0bd96"))
-				for side in [-1,1]: game.draw_rect(Rect2(p+Vector2(side*unit*0.41-unit*0.08,-unit*0.22),Vector2(unit*0.16,unit*0.44)),Color("a06647"))
+				game.draw_texture_rect(PAVING,r,false)
+				for side in [-1,1]: item(game,CRATE_ART,p+Vector2(side*unit*0.41,0),Vector2(unit*0.24,unit*0.53))
 			else:
-				game.draw_rect(r,Color("47705d"))
+				game.draw_texture_rect(BLOCKED_ART,r,false)
 				if (x+2*y)%4==0: item(game,game.World.TENT,p,Vector2(unit*1.04,unit))
 				elif (2*x+y)%3==0: item(game,game.World.TABLE,p,Vector2(unit*0.84,unit*0.72))
-				else: game.draw_rect(r.grow(-unit*0.22),Color("916549"))
+				else: item(game,CRATE_ART,p,Vector2(unit*0.85,unit*0.85))
 	var goal := center(destination)
-	if explored.has(destination):
-		item(game,game.World.TENT,goal,Vector2(unit*1.03,unit))
-		game.draw_arc(goal,unit*0.46,0,TAU,20,GOLD,3)
+	item(game,game.World.TENT,goal,Vector2(unit*1.03,unit))
+	game.draw_arc(goal,unit*0.46,0,TAU,20,GOLD,3)
 	if report: return
 	var p := center(from_player).lerp(center(player),1-player_motion/0.14)
 	var g := center(from_guest).lerp(center(guest),1-guest_motion/0.18)
@@ -227,4 +214,4 @@ func controls(game: Control) -> void:
 	game.draw_arc(JOY,63,0,TAU,36,CREAM,2)
 	game.draw_circle(JOY+joystick*39,23,GOLD)
 	label(game,Vector2(169,517),"Joystick o flechas",239,GOLD)
-	label(game,Vector2(169,558),"Explora el laberinto, mantén a tu acompañante cerca y busca la tienda dorada.",232)
+	label(game,Vector2(169,558),"Verde: te sigue. Rojo: espera. La tienda dorada es la meta.",232)

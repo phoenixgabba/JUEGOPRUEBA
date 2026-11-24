@@ -339,30 +339,25 @@ func draw_puzzle(game: Control, vertical: bool) -> void:
 		game.clickables.append({"rect":game.mini_hit(r),"id":"activity:" + str(i)})
 
 func draw_catch(game: Control, vertical: bool) -> void:
-	game.text(Vector2(30,47), "Cocina · Reparto %d/%d" % [food,FOOD_GOAL], 28)
-	game.paragraph(Vector2(30,88 if vertical else 81), "Recoge comida y evita herramientas. Golpes: %d/3" % strikes, 360 if vertical else 700, 22 if vertical else 18)
-	var lane_width := 77 if vertical else 132
-	var lane_x := 18 if vertical else 46
-	var lane_y := 154 if vertical else 112
-	var lane_h := 456 if vertical else 300
+	game.text(Vector2(30,47), "Cocina · Alimentos %d/%d" % [food,FOOD_GOAL], 28)
+	game.paragraph(Vector2(30,88 if vertical else 81), "Recoge comida y esquiva herramientas. Golpes: %d/3" % strikes, 360 if vertical else 700, 22 if vertical else 18)
+	var lane_width := 77 if vertical else 137
+	var lane_x := 18 if vertical else 40
+	var lane_y := 156 if vertical else 104
+	var lane_h := 460 if vertical else 313
+	var lane_center := lane_x + (lane_width - 8) * 0.5
 	for i in range(5):
 		var lane := Rect2(lane_x + i * lane_width, lane_y, lane_width - 8, lane_h)
-		game.draw_rect(lane, Color("405e4f"))
-		game.draw_rect(Rect2(lane.position.x, lane.position.y, lane.size.x, 28), Color("6f4f2f"))
-		game.draw_rect(Rect2(lane.position.x, lane.end.y - 33, lane.size.x, 33), Color("5c4127"))
-		for step in range(1, 5):
-			game.draw_line(Vector2(lane.position.x + 5, lane.position.y + step * lane_h / 5.0), Vector2(lane.end.x - 5, lane.position.y + step * lane_h / 5.0), Color("547667"), 1)
-		game.text(lane.position + Vector2(0, 19), "Puesto %d" % [i + 1], 13, CREAM, true, lane.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		btn(game,Rect2(lane.position.x, lane.end.y + (18 if vertical else 24), lane.size.x, 52 if vertical else 44),str(i+1),str(i))
+		game.draw_rect(lane, Color("3a5346"))
+		btn(game,Rect2(lane.position.x, lane.end.y + (18 if vertical else 33), lane.size.x, 60 if vertical else 44),str(i+1),str(i))
 		if vertical:
 			game.clickables.append({"rect":game.mini_hit(lane), "id":"activity:" + str(i)})
 	for item in falling:
-		var p := Vector2(lane_x + item.lane * lane_width + (lane_width - 8) * 0.5, lane_y + 35 + item.y * (lane_h - 78))
-		game.draw_circle(p + Vector2(3, 5), 15, Color(0, 0, 0, 0.22))
+		var p := Vector2(lane_center + item.lane * lane_width, lane_y + 20 + item.y * (lane_h - 50))
 		match int(item.icon):
 			0:
-				game.draw_rect(Rect2(p-Vector2(18,10),Vector2(36,18)), Color("be8045"))
-				for cut in [-9,0,9]: game.draw_line(p+Vector2(cut,-8),p+Vector2(cut-4,3),Color("f5cd83"),2)
+				game.draw_rect(Rect2(p-Vector2(18,9),Vector2(36,17)), Color("be8045"))
+				for cut in [-9,0,9]: game.draw_line(p+Vector2(cut,-7),p+Vector2(cut-4,3),Color("f5cd83"),2)
 			1:
 				game.draw_circle(p+Vector2(-6,1),10,Color("ce5847"))
 				game.draw_circle(p+Vector2(6,1),10,Color("ce5847"))
@@ -373,13 +368,8 @@ func draw_catch(game: Control, vertical: bool) -> void:
 			3:
 				game.draw_circle(p+Vector2(0,-4),13,Color("699f4a"))
 				game.draw_rect(Rect2(p+Vector2(-3,4),Vector2(7,12)),Color("abd075"))
-		var pill := Rect2(p+Vector2(-29,18),Vector2(58,18))
-		game.draw_rect(pill,Color(INK,0.75))
-		game.text(pill.position+Vector2(0,13),["Pan","Fruta","Llave","Verdura"][item.icon],12,CREAM,true,pill.size.x,HORIZONTAL_ALIGNMENT_CENTER)
-	var selector := Rect2(lane_x + player_lane * lane_width + 7, lane_y + lane_h - 24, lane_width - 22, 16)
-	game.draw_rect(selector, Color("f2c97a"))
-	game.draw_rect(selector.grow(2), Color("8a693c"), false, 2)
-	game.text(Vector2(26 if vertical else 46, 640 if vertical else 442), "Usa 1–5 o toca un puesto para mover tu cesta.", 16, GOLD, false, 360 if vertical else 690)
+		game.text(p+Vector2(-53,30),["Pan","Fruta","Llave","Verdura"][item.icon],15,Color("fff1cf"),true,106,HORIZONTAL_ALIGNMENT_CENTER)
+	game.draw_rect(Rect2(lane_center + player_lane * lane_width - 28.5, lane_y + lane_h - 23, 57, 17),Color("f2c97a"))
 
 func draw_agenda(game: Control, vertical: bool) -> void:
 	game.text(Vector2(30,47), "Orden del día" if vertical else "Organización · Orden del día", 28)

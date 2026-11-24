@@ -53,7 +53,7 @@ Source SHA-256: 38f4c5f927f746b3dfa4c3a5d7edf0b7a3e828e27438418fa54f9e1565289412
   </section>
   <script>
     (() => {
-      const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":true,"fileSizes":{"pruebas-fb585d02d0.pck":19081448,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+      const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index","experimentalVK":true,"fileSizes":{"pruebas-4a636fbdc0.pck":19077912,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
       const threads = false;
       const canvas = document.getElementById('canvas');
       const loading = document.getElementById('loading');
@@ -136,7 +136,7 @@ Source SHA-256: 38f4c5f927f746b3dfa4c3a5d7edf0b7a3e828e27438418fa54f9e1565289412
           const missing = Engine.getMissingFeatures({ threads });
           if (missing.length) throw new Error(`Missing browser features: ${missing.join(', ')}`);
           const engine = new Engine({ ...config, canvas });
-          await engine.startGame({ onProgress, mainPack: "pruebas-fb585d02d0.pck" });
+          await engine.startGame({ onProgress, mainPack: "pruebas-4a636fbdc0.pck" });
           if (failed) return;
           ready = true;
           stopObserving();
