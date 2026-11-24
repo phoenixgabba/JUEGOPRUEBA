@@ -1,211 +1,213 @@
 extends "res://scripts/camp/activities_two/session.gd"
 
-const GRID := Vector2i(8,6)
-const TILE := Vector2(49,48)
-const START := Vector2(24,103)
-const ENTRIES := [Vector2i(0,1),Vector2i(0,4)]
-const GOALS := [Vector2i(7,1),Vector2i(7,4)]
-const STEPS := [Vector2i.UP,Vector2i.DOWN,Vector2i.LEFT,Vector2i.RIGHT]
-var furniture: Dictionary = {}
-var lanes: Dictionary = {}
-var benches: Array[Vector2i] = []
-var guests: Array[Dictionary] = []
-var routes: Dictionary = {}
-var selected := Vector2i(-1,-1)
-var moved_from := Vector2i(-1,-1)
-var tool := "move"
-var lane_supply := 12
-var served := 0
-var left := 0
-var accessible := 0
-var waiting_total := 0.0
-var next_arrival := 0.0
-var next_step := 0.0
-var entry := 0
-var destination := 0
-var bench_selected := Vector2i(-1,-1)
+const BOARD := Rect2(20,90,400,310)
+const JOY := Vector2(91,552)
+const DIRS := [Vector2i(1,0),Vector2i(0,1),Vector2i(-1,0),Vector2i(0,-1)]
+var field := Rect2i()
+var open_cells := {}
+var narrow := {}
+var player := Vector2i.ZERO
+var guest := Vector2i.ZERO
+var destination := Vector2i.ZERO
+var from_player := Vector2i.ZERO
+var from_guest := Vector2i.ZERO
+var player_motion := 0.0
+var guest_motion := 0.0
+var joystick := Vector2.ZERO
+var direction_buffer := Vector2i.ZERO
+var stage := 0
+var steps := 0
+var optimal := 0
+var separated := 0
+var waiting := false
+var guest_delay := 0.0
 
 func initialize(seed_value: int, plan: String) -> void:
 	super.initialize(seed_value,plan)
-	title = "Accesibilidad"
-	help = "Desplaza una tienda, mesa o caja a una casilla libre. También puedes tocar origen y destino."
-	lane_supply += 3 if plan == "Acceso" else 0
-	furniture = {Vector2i(3,0):0,Vector2i(3,2):1,Vector2i(3,4):0,Vector2i(3,5):2,Vector2i(5,3):1,
-		Vector2i(5+rng.randi_range(-1,1),2):2,Vector2i(1+rng.randi_range(0,1),3):1}
-	benches = [Vector2i(7,0),Vector2i(7,3)]
+	title = "Accesibilidad · hacia tu tienda"
+	help = "Mueve el joystick o usa WASD y las flechas. Guía a la persona hasta la tienda dorada. Las cajas estrechas solo te dejan pasar a ti."
+	generate()
+	optimal = 0
 
-func inside(cell: Vector2i) -> bool:
-	return Rect2i(Vector2i.ZERO,GRID).has_point(cell)
+func generate() -> void:
+	var width: int = [9,13,15][stage]
+	var height: int = [7,9,11][stage]
+	field = Rect2i(0,0,width,height)
+	open_cells.clear()
+	narrow.clear()
+	player = Vector2i(1,1)
+	guest = player
+	destination = Vector2i(width-2,height-2)
+	var stack: Array[Vector2i] = [player]
+	open_cells[player] = true
+	while not stack.is_empty():
+		var here: Vector2i = stack.back()
+		var options: Array[Vector2i] = []
+		for dir: Vector2i in DIRS:
+			var there := here+dir*2
+			if field.grow(-1).has_point(there) and not open_cells.has(there): options.append(there)
+		if options.is_empty():
+			stack.pop_back()
+		else:
+			var next: Vector2i = options[rng.randi_range(0,options.size()-1)]
+			open_cells[(here+next)/2] = true
+			open_cells[next] = true
+			stack.append(next)
+	var crossings: Array[Vector2i] = []
+	for y in range(1,height-1):
+		for x in range(1,width-1):
+			var cell := Vector2i(x,y)
+			if open_cells.has(cell): continue
+			if (open_cells.has(cell+Vector2i.LEFT) and open_cells.has(cell+Vector2i.RIGHT)) or (open_cells.has(cell+Vector2i.UP) and open_cells.has(cell+Vector2i.DOWN)):
+				crossings.append(cell)
+	for i in range(mini(crossings.size(),3+stage*2)):
+		var cell: Vector2i = crossings.pop_at(rng.randi_range(0,crossings.size()-1))
+		if i%3==0: narrow[cell] = true
+		else: open_cells[cell] = true
+	from_player = player
+	from_guest = guest
+	player_motion = 0
+	guest_motion = 0
+	guest_delay = 0
+	waiting = false
+	optimal += find_route(guest,destination,false).size()-1
 
-func width_at(cell: Vector2i) -> bool:
-	if lanes.has(cell): return true
-	var adjacent := 0
-	for step in STEPS:
-		var neighbor: Vector2i = cell + step
-		if inside(neighbor) and not furniture.has(neighbor): adjacent += 1
-	return adjacent >= 3 or cell in ENTRIES or cell in GOALS
+func walkable(tile: Vector2i, player_only: bool) -> bool:
+	return open_cells.has(tile) or (player_only and narrow.has(tile))
 
-func route(origin: Vector2i, goal: Vector2i, mobility: int) -> Array:
-	var cache_key := [origin,goal,mobility]
-	if routes.has(cache_key): return routes[cache_key]
-	var line := [origin]
-	var parent := {origin:origin}
-	var cursor := 0
-	while cursor < line.size():
-		var current: Vector2i = line[cursor]
-		if current == goal:
-			var path := [goal]
-			while path[0] != origin: path.push_front(parent[path[0]])
-			routes[cache_key] = path
-			return path
-		cursor += 1
-		for step in STEPS:
-			var neighbor: Vector2i = current + step
-			if not inside(neighbor) or furniture.has(neighbor) or parent.has(neighbor): continue
-			if mobility == 1 and not width_at(neighbor): continue
-			parent[neighbor] = current
-			line.append(neighbor)
-	routes[cache_key] = []
-	return []
-
-func center(cell: Vector2i) -> Vector2:
-	return START + (Vector2(cell)+Vector2(0.5,0.5))*TILE
-
-func cell_at(point: Vector2) -> Vector2i:
-	return Vector2i(((point - START)/TILE).floor())
+func find_route(origin: Vector2i, target: Vector2i, player_only: bool) -> Array[Vector2i]:
+	var route: Array[Vector2i] = []
+	if not walkable(target,player_only): return route
+	var queue: Array[Vector2i] = [origin]
+	var previous := {origin:origin}
+	var i := 0
+	while i<queue.size():
+		var tile := queue[i]
+		i += 1
+		if tile==target:
+			route.append(tile)
+			while tile!=origin:
+				tile = previous[tile]
+				route.push_front(tile)
+			return route
+		for dir: Vector2i in DIRS:
+			var neighbor := tile+dir
+			if walkable(neighbor,player_only) and not previous.has(neighbor):
+				previous[neighbor] = tile
+				queue.append(neighbor)
+	return route
 
 func begin_drag(point: Vector2) -> bool:
-	moved_from = cell_at(point)
-	return tool == "move" and furniture.has(moved_from)
+	if point.distance_to(JOY+controls_offset)>70: return false
+	set_joystick(point)
+	return true
 
-func end_drag(point: Vector2) -> void:
-	var target := cell_at(point)
-	if target == moved_from:
-		selected = moved_from
-		return
-	relocate(moved_from,target)
+func move_drag(_delta: Vector2) -> void:
+	set_joystick(drag_cursor)
 
-func relocate(source: Vector2i, target: Vector2i) -> void:
-	if not inside(target) or target.x in [0,7] or furniture.has(target) or lanes.has(target): return
-	if guests.any(func(guest): return guest.cell == target or guest.next == target):
-		feedback("Espera a que quede libre esa casilla.",center(target))
-		return
-	furniture[target] = furniture[source]
-	furniture.erase(source)
-	selected = Vector2i(-1,-1)
-	routes.clear()
-	trained()
-	feedback("Mobiliario movido. Las visitas recalculan su ruta.",center(target))
+func end_drag(_point: Vector2) -> void:
+	joystick = Vector2.ZERO
+
+func set_joystick(point: Vector2) -> void:
+	joystick = ((point-JOY-controls_offset)/43).limit_length(1)
+
+func key(code: int) -> void:
+	super.key(code)
+	var keys := {KEY_LEFT:Vector2i.LEFT,KEY_RIGHT:Vector2i.RIGHT,KEY_UP:Vector2i.UP,KEY_DOWN:Vector2i.DOWN,
+		KEY_A:Vector2i.LEFT,KEY_D:Vector2i.RIGHT,KEY_W:Vector2i.UP,KEY_S:Vector2i.DOWN}
+	if keys.has(code): direction_buffer = keys[code]
 
 func perform(value: String) -> void:
-	var parts := value.split(":")
-	if parts[0] == "tool":
-		tool = parts[1]
-		return
-	if parts[0] != "cell": return
-	var cell := Vector2i(int(parts[1]),int(parts[2]))
-	if tool == "rest":
-		if cell in benches:
-			bench_selected = cell
-		elif bench_selected in benches and inside(cell) and cell.x not in [0,7] and not furniture.has(cell):
-			benches[benches.find(bench_selected)] = cell
-			bench_selected = Vector2i(-1,-1)
-			feedback("Zona de descanso reubicada.",center(cell))
-		return
-	if tool == "lane":
-		if furniture.has(cell) or cell.x in [0,7]: return
-		if lanes.has(cell):
-			lanes.erase(cell)
-			lane_supply += 1
-		elif lane_supply > 0:
-			lanes[cell] = true
-			lane_supply -= 1
-		routes.clear()
-	elif furniture.has(cell):
-		selected = cell
-	elif furniture.has(selected):
-		relocate(selected,cell)
+	if value in ["right","down","left","up"]: direction_buffer = DIRS[["right","down","left","up"].find(value)]
 
-func advance(_delta: float) -> void:
-	if active_time >= next_arrival and active_time < 177.0:
-		var stage := mini(floori(active_time/55),3)
-		var mobility := (entry+stage)%3
-		destination = rng.randi_range(0,1) if stage > 0 else entry%2
-		next_arrival = active_time + 8.2-stage*1.25
-		guests.append({"cell":ENTRIES[entry%2],"next":ENTRIES[entry%2],"target":GOALS[destination],"mobility":mobility,"born":active_time,"step":active_time,"stamina":5})
-		entry += 1
-	if active_time >= next_step:
-		next_step = active_time + 0.48
-		walk()
-	score = clampi(served*3+accessible*2-left*4-roundi(waiting_total/7),0,100)
-	if active_time >= 190 and (served >= 10 or active_time >= 240):
-		finish(score,"%d llegadas · %d con movilidad asistida · %d abandonos. Tiempo acumulado en el recorrido: %ds." % [served,accessible,left,roundi(waiting_total)])
-	elif active_time >= 190 and active_time >= next_arrival:
-		next_arrival = active_time+6
-		guests.append({"cell":ENTRIES[entry%2],"next":ENTRIES[entry%2],"target":GOALS[entry%2],"mobility":1,"born":active_time,"step":active_time,"stamina":5})
-		entry += 1
+func tick(delta: float) -> void:
+	super.tick(delta)
+	if report: return
+	player_motion = maxf(0,player_motion-delta)
+	guest_motion = maxf(0,guest_motion-delta)
+	guest_delay = maxf(0,guest_delay-delta)
+	var speed := 0.14
+	if player_motion==0:
+		var input := joystick
+		if input.length()<0.23:
+			input = Input.get_vector("move_left","move_right","move_up","move_down")
+		var direction := direction_buffer
+		direction_buffer = Vector2i.ZERO
+		if input.length()>=0.23:
+			direction = Vector2i(int(signf(input.x)),0) if absf(input.x)>absf(input.y) else Vector2i(0,int(signf(input.y)))
+		if direction!=Vector2i.ZERO:
+			var next := player+direction
+			if walkable(next,true):
+				from_player = player
+				player = next
+				player_motion = speed
+				steps += int(not tutorial)
+				if tutorial:
+					trained()
+					optimal = find_route(guest,destination,false).size()-1
+					feedback("Ve despacio. Tu acompañante necesita un paso ancho.")
+	if guest_motion>0 or guest_delay>0: return
+	var route := find_route(guest,player,false)
+	var stopped := route.is_empty() or route.size()>9
+	if stopped and not waiting:
+		separated += 1
+		feedback("Tu acompañante espera. Vuelve por un paso ancho.")
+	waiting = stopped
+	if not waiting and (route.size()>2 or (player==destination and route.size()>1)):
+		from_guest = guest
+		guest = route[1]
+		guest_motion = 0.18
+		guest_delay = 0.20
+	elif guest==destination and player==destination:
+		advance_board()
 
-func walk() -> void:
-	var capacity := {}
-	for guest in guests:
-		capacity[guest.cell] = int(capacity.get(guest.cell,0))+1
-	for i in range(guests.size()-1,-1,-1):
-		var guest := guests[i]
-		if guest.next != guest.cell and active_time >= guest.step:
-			guest.cell = guest.next
-			if guest.mobility == 2:
-				var near_bench := benches.any(func(bench): return Vector2i(bench).distance_to(guest.cell) <= 1)
-				guest.stamina = 5 if near_bench else maxi(0,int(guest.stamina)-1)
-		if guest.cell == guest.target:
-			served += 1
-			if guest.mobility > 0: accessible += 1
-			waiting_total += maxf(0,active_time-guest.born-7)
-			bursts.append({"p":center(guest.cell),"time":clock})
-			guests.remove_at(i)
-			continue
-		if active_time - guest.born > 30:
-			left += 1
-			guests.remove_at(i)
-			continue
-		if active_time < guest.step: continue
-		var path := route(guest.cell,guest.target,guest.mobility)
-		if path.size() <= 1: continue
-		var next: Vector2i = path[1]
-		if capacity.get(next,0) >= (2 if lanes.has(next) else 1): continue
-		capacity[next] = int(capacity.get(next,0))+1
-		guest.next = next
-		guest.step = active_time + (0.55 if guest.mobility == 0 else 0.9)
-		if guest.mobility == 2 and guest.stamina == 0: guest.step += 0.65
+func advance_board() -> void:
+	stage += 1
+	if stage==3:
+		finish(clampi(100-maxi(0,steps-optimal)-roundi(active_time/5)-separated*4,0,100),
+			"Tres acompañamientos · %d pasos · %d separaciones · %.1f s."%[steps,separated,active_time])
+	else:
+		generate()
+		feedback("Llegasteis juntos. La siguiente zona tiene más cruces.")
+
+func center(tile: Vector2i) -> Vector2:
+	var unit := minf(BOARD.size.x/field.size.x,BOARD.size.y/field.size.y)
+	return BOARD.get_center()+(Vector2(tile)+Vector2(0.5,0.5)-Vector2(field.size)/2)*unit
 
 func status() -> String:
-	return "%ds    •    %d llegadas    •    %d en tránsito" % [ceili(maxf(0,190-active_time)),served,guests.size()]
+	return "Tramo %d/3  •  %d pasos  •  %.1f s"%[mini(stage+1,3),steps,active_time]
 
 func scene(game: Control) -> void:
-	backdrop(game,Vector2(810,395),Color(0.25,0.20,0.1,0.35))
-	for y in range(GRID.y):
-		for x in range(GRID.x):
-			var cell := Vector2i(x,y)
-			var r := Rect2(START+Vector2(cell)*TILE,TILE-Vector2.ONE*2)
-			game.draw_rect(r,Color("b0bc86") if lanes.has(cell) else Color("c6b388") if (x+y)%2 else Color("d9c79d"))
-			if cell in ENTRIES or cell in GOALS:
-				game.text(r.position+Vector2(0,29),"→" if cell in ENTRIES else "⚑",21,INK,true,r.size.x,HORIZONTAL_ALIGNMENT_CENTER)
-			if cell in benches: game.draw_rect(Rect2(r.position+Vector2(8,15),Vector2(31,13)),Color("88634b"))
-			if cell == selected or cell == bench_selected: game.draw_rect(r,GOLD,false,3)
-			if furniture.has(cell):
-				var kind: int = furniture[cell]
-				if kind == 2: game.draw_rect(r.grow(-11),Color("976349"))
-				else: item(game,game.World.TENT if kind == 0 else game.World.TABLE,center(cell),Vector2(48,43))
-			hit(game,r,"cell:%d:%d"%[x,y])
-	for guest in guests:
-		var duration := 0.55 if guest.mobility == 0 else 0.9
-		var p := center(guest.cell).lerp(center(guest.next),clampf(1-(guest.step-active_time)/duration,0,1))
-		if guest.mobility != 0: game.draw_circle(p+Vector2(0,9),8,Color("3e6f78") if guest.mobility == 1 else Color("937331"))
-		actor(game,p+Vector2(0,10),guest.mobility,0.65,guest.cell!=guest.next)
-	if drag_id != -2: game.draw_rect(Rect2(drag_cursor-Vector2(12,12),Vector2(24,24)),GOLD,false,3)
+	backdrop(game,Vector2(810,395),Color(0.19,0.23,0.11,0.34))
+	var unit := minf(BOARD.size.x/field.size.x,BOARD.size.y/field.size.y)
+	for y in range(field.size.y):
+		for x in range(field.size.x):
+			var tile := Vector2i(x,y)
+			var p := center(tile)
+			var r := Rect2(p-Vector2.ONE*unit/2,Vector2.ONE*unit)
+			if open_cells.has(tile):
+				game.draw_rect(r,Color("d0bd96") if (x+y)%2==0 else Color("cbb58b"))
+			elif narrow.has(tile):
+				game.draw_rect(r,Color("d0bd96"))
+				for side in [-1,1]: game.draw_rect(Rect2(p+Vector2(side*unit*0.41-unit*0.08,-unit*0.22),Vector2(unit*0.16,unit*0.44)),Color("a06647"))
+			else:
+				game.draw_rect(r,Color("47705d"))
+				if (x+2*y)%4==0: item(game,game.World.TENT,p,Vector2(unit*1.04,unit))
+				elif (2*x+y)%3==0: item(game,game.World.TABLE,p,Vector2(unit*0.84,unit*0.72))
+				else: game.draw_rect(r.grow(-unit*0.22),Color("916549"))
+	var goal := center(destination)
+	item(game,game.World.TENT,goal,Vector2(unit*1.03,unit))
+	game.draw_arc(goal,unit*0.46,0,TAU,20,GOLD,3)
+	if report: return
+	var p := center(from_player).lerp(center(player),1-player_motion/0.14)
+	var g := center(from_guest).lerp(center(guest),1-guest_motion/0.18)
+	game.draw_circle(g,unit*0.37,RED if waiting else GREEN)
+	actor(game,g+Vector2(0,unit*0.18),1,unit/45,guest_motion>0)
+	actor(game,p+Vector2(0,unit*0.20),3,unit/42,player_motion>0)
 
 func controls(game: Control) -> void:
-	button(game,Rect2(20,485,196,58),"Mover mobiliario","tool:move",tool=="move")
-	button(game,Rect2(223,485,197,58),"Carril ancho · %d"%lane_supply,"tool:lane",tool=="lane")
-	button(game,Rect2(20,551,400,51),"Trasladar bancos de descanso","tool:rest",tool=="rest")
-	label(game,Vector2(20,625),"Carril ancho: dos visitas a la vez. Los bancos recuperan la resistencia de quienes van despacio.",398)
-	label(game,Vector2(20,680),"Llegadas asistidas %d  ·  Abandonos %d  ·  Puntos %d"%[accessible,left,score],398,GREEN)
+	game.draw_circle(JOY,63,Color("284e48"))
+	game.draw_arc(JOY,63,0,TAU,36,CREAM,2)
+	game.draw_circle(JOY+joystick*39,23,GOLD)
+	label(game,Vector2(169,517),"Joystick o flechas",239,GOLD)
+	label(game,Vector2(169,558),"Verde: te sigue. Rojo: espera. La tienda dorada es la meta.",232)

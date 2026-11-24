@@ -18,6 +18,9 @@ func run() -> void:
 	key_event.pressed = true
 	key_event.keycode = KEY_P
 	main._input(key_event)
+	assert(not main.phone_ui.shown)
+	main.s.phone.unlock("phone")
+	main._input(key_event)
 	assert(main.phone_ui.shown and main.phone_ui.at == "home")
 	main.phone_ui.close()
 	main.talk_to("Patricia")

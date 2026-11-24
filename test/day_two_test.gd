@@ -44,45 +44,69 @@ func run() -> void:
 	main._process(0.01)
 	assert(main.s.assembly_plan in ["Acceso", "Cuidados", "Difusión", "Descanso"])
 
-	for turn in range(CampState.DAY_TWO_ORDER.size()):
-		var i: int = CampState.DAY_TWO_ORDER[turn]
-		assert(main.s.phase == "commissions_two")
-		assert(main.s.next_day_two_commission() == i)
-		main.s.player = main.DayTwo.POINTS[i]
+	for turn in range(5):
+		var index: int = main.s.next_day_two_commission()
+		assert(index == turn and main.s.phase == "commissions_two")
+		assert(main.s.tents == 25 + 5*turn)
+		main.s.player = main.DayTwo.POINTS[index]
 		main.interact()
-		if i == CampState.NETWORKS:
-			assert(main.phone_ui.shown and main.phone_ui.at == "social")
-			main.launch_network_from_phone()
-		assert(main.day_two_open and main.commission_open)
-		match i:
-			0: play_photo(activity)
-			1: play_dispatch(activity)
-			2: play_mediation(activity)
-			3: play_clinic(activity)
-			4: play_access(activity)
-		assert(activity.session.report)
-		activity.action("finish")
-		assert(activity.done)
-		main._process(0.01)
+		if index == 0:
+			play_networks(main)
+		else:
+			assert(main.day_two_open and main.commission_open)
+			match index:
+				1: play_dispatch(activity)
+				2: play_memory(activity)
+				3: play_clinic(activity)
+				4: play_access(activity)
+			assert(activity.session.report)
+			activity.action("finish")
+			main._process(0.01)
 		assert(main.s.day_two_commissions == turn + 1)
 		main.close_dialog()
 		for j in range(5):
-			assert(CampWorld.walkable(CampWorld.next_pitch(main.s), main.s))
-			assert(main.s.delivery == "delegated")
-			main.update_deliveries(6.1)
-
+			var before: int = main.s.tents
+			assert(main.s.delivery == "offer" and main.s.phase == "expansion")
+			main.update_deliveries(10)
+			assert(main.s.tents == before)
+			main.s.player = CampWorld.ENTRANCE
+			main.interact()
+			main.close_dialog()
+			var pitch := CampWorld.next_pitch(main.s)
+			assert(CampWorld.walkable(pitch,main.s))
+			main.s.player = pitch
+			if main.s.phase=="build":
+				for step in range(4):
+					main.interact()
+					assert(main.mini)
+					main.complete_build_stage()
+					main.close_dialog()
+				main.update_deliveries(1.7)
+			else:
+				main.interact()
+				assert(main.s.delivery == "placing")
+				main.update_deliveries(0.8)
+				assert(main.s.tents == before and main.s.delivery_progress > 0)
+				main.update_deliveries(0.9)
+			assert(main.s.tents == before + 1)
+			assert(CampWorld.pitch_count(main.s) == main.s.tents - 1)
 	assert(main.s.tents == 50 and main.s.delivery == "close")
 	main.s.save_game()
 	var restored := CampState.new()
 	assert(restored.load_game())
 	assert(restored.day == 2 and restored.tents == 50 and restored.day_two_commissions == 5)
 	assert(restored.assembly_plan == main.s.assembly_plan)
-	assert(restored.media_count == 3 and restored.posts.size() == 3 and restored.day_two_completed == 31)
+	assert(restored.commissions + restored.day_two_commissions == 8)
+	assert(restored.media_count == 3 and restored.phone.data.social.size() == 3 and restored.day_two_completed == 31)
 	main.open_phone()
-	main.phone_ui.navigate("social","campaign:0")
+	main.phone_ui.navigate("social")
 	assert(main.phone_ui.shown and main.phone_ui.at == "social")
 	assert(restored.phone.data.photos.size() == 3)
 	main.phone_ui.close()
+	main.s.player = CampWorld.ORGANIZATION
+	assert(main.interact_with_delivery())
+	main.close_dialog()
+	assert(main.s.phase == "finished" and main.screen == "result")
 	var normal_save := FileAccess.get_file_as_string(CampState.SAVE_PATH)
 	main.test_build = true
 	for checkpoint in range(14):
@@ -100,7 +124,6 @@ func run() -> void:
 	main.clickables = [{"rect": Rect2(0, 0, 100, 100), "id": "checkpoint:6"}]
 	main.pointer_down(Vector2(20, 20), -1)
 	assert(main.commission_open and activity.mode == "seguridad")
-	verify_tradeoffs(main.DayTwo)
 	main.activity_sound.stop()
 	main.queue_free()
 	await process_frame
@@ -141,158 +164,114 @@ func play_assembly(activity) -> void:
 		if not solved: return
 	assert(game.score > 0)
 
-func play_access(activity) -> void:
-	var game = activity.session
-	var source := Vector2i(3,2)
-	var destination := Vector2i(2,0)
-	assert(activity.begin_aim(game.center(source),5))
-	activity.aim(game.center(destination)-game.center(source),5)
-	activity.release_aim(5)
-	assert(game.furniture.has(destination) and not game.tutorial)
-	activity.action("tool:lane")
-	activity.action("cell:3:2")
-	assert(game.lane_supply <= 14 and game.lanes.has(source))
-	for step in range(850):
-		activity.tick(0.25)
-		if game.report: break
-	assert(game.active_time >= 190 and game.served >= 10 and game.accessible > 0)
-
-func play_photo(activity) -> void:
-	var game = activity.session
-	activity.action("capture")
-	assert(not game.tutorial and game.gallery.is_empty())
-	for window in range(3):
-		var target: float = game.UNLOCK[window]
-		while game.simulated_time < target or game.used.has(game.event_index) or game.event_phase(game.simulated_time) < 6 or game.event_phase(game.simulated_time) > 11:
-			activity.tick(0.25)
-		var subject: int = game.event_index
-		var required: Vector2 = game.subject_position(subject,game.simulated_time)-Vector2(220,232)
-		assert(activity.begin_aim(Vector2(200,200),0))
-		activity.aim((game.offset-required)*(1+game.zoom*0.22),0)
-		activity.release_aim(0)
-		activity.action("capture")
-		activity.action("gallery")
-		while game.caption != subject: activity.action("caption")
-		activity.action("publish")
-	assert(game.posts.size() == 3 and game.used.size() == 3 and game.score >= 65)
-	for step in range(800):
-		if game.report: break
-		activity.tick(0.25)
-	assert(game.active_time >= 185)
+func play_networks(main) -> void:
+	assert(main.can_open_phone() and main.network_assignment_active() and not main.phone_ui.shown)
+	main.open_phone()
+	main.phone_ui.navigate("social","account")
+	assert(not main.phone_ui.save_profile("Acampada València","","camp-logo"))
+	assert(main.phone_ui.save_profile("Acampada València","Noticias de la plaza.","camp-logo"))
+	main.phone_ui.close()
+	main.phone_ui.progress = 0
+	var pixels := Image.create_empty(64,48,false,Image.FORMAT_RGB8)
+	pixels.fill(Color("85af87"))
+	for i in range(3):
+		var point: Vector2 = main.Networks.POINTS[i]
+		main.s.player = point+Vector2(70,0)
+		assert(main.capture_network_subject(Rect2(point-Vector2(40,40),Vector2(80,80))).is_empty())
+		main.s.player = point
+		assert(main.interact_day_two())
+		assert(main.s.phone.data.network.prepared==i)
+		assert(main.capture_network_subject(Rect2(0,0,24,24)).is_empty())
+		var subject: Dictionary = main.capture_network_subject(Rect2(point-Vector2(40,40),Vector2(80,80)))
+		assert(subject.subject==i and subject.quality>85)
+		var key: String = main.s.phone.photo(pixels,subject)
+		main.s.phone.publish(key,"Escena de la plaza",false)
+		assert(main.network_publication() == (i==2))
+	assert(main.s.phone.data.network.misses==3)
 
 func play_dispatch(activity) -> void:
 	var game = activity.session
-	activity.action("observe:0")
-	activity.action("send")
-	var assignments := [-1,-1,-1]
-	for step in range(800):
+	activity.action("spot:4")
+	assert(not game.tutorial)
+	var got_error := false
+	for frame in range(2500):
+		activity.tick(0.04)
+		for slot in game.slots.keys():
+			if game.slots[slot].role==0:
+				activity.action("spot:%d"%slot)
+			elif not got_error:
+				activity.action("spot:%d"%slot)
+				got_error = true
 		if game.report: break
-		activity.tick(0.25)
-		for zone in range(4):
-			var case: Dictionary = game.incidents[zone]
-			if case.is_empty() or case.type == 5 or int(case.id) in assignments: continue
-			var worker: int = game.TYPES[case.type][2]
-			if game.workers[worker].zone >= 0:
-				var previous: Dictionary = game.incidents[game.workers[worker].zone]
-				if not previous.is_empty() and previous.id in assignments: continue
-			activity.action("worker:%d"%worker)
-			activity.action("observe:%d"%zone)
-			activity.action("send")
-			assignments[worker] = case.id
-	assert(game.resolved > 1 and game.active_time >= 193)
+	assert(game.report and game.correct==15 and game.mistakes==1 and game.score<100)
 
-func play_mediation(activity) -> void:
+func play_memory(activity) -> void:
 	var game = activity.session
-	for chapter in range(5):
-		for side in range(2):
-			activity.action("person:%d"%side)
-			for topic in range(3): activity.action("topic:%d"%topic)
-		assert(not game.tutorial)
-		for axis in range(2):
-			var side: int = game.style.find(axis)
-			while game.terms[axis] != game.interests[side][axis]: activity.action("term:%d"%axis)
-		activity.action("pilot")
-		assert(game.chapter == chapter + 1)
-	assert(game.agreements == 5 and game.score > 60)
+	for board in range(4):
+		if board==1:
+			var wrong: int = game.deck.find_custom(func(id): return id!=game.deck[0])
+			activity.action("card:0")
+			activity.action("card:%d"%wrong)
+			activity.action("card:%d"%((wrong+1)%game.deck.size()))
+			assert(game.opened.size()==2 and game.errors==1)
+			activity.tick(0.9)
+			assert(game.opened.is_empty())
+		for i in range(game.deck.size()):
+			if game.matched.has(i): continue
+			activity.action("card:%d"%i)
+			activity.action("card:%d"%game.deck.find(game.deck[i],i+1))
+			if board==0: break
+		activity.tick(0.72)
+	assert(game.report and game.pairs==20 and game.errors==1)
 
 func play_clinic(activity) -> void:
 	var game = activity.session
-	activity.action("station:2")
-	assert(game.tutorial)
-	activity.action("station:0")
-	assert(not game.tutorial)
-	for step in range(800):
-		if game.report: break
-		activity.tick(0.25)
-		if game.workers.all(func(worker): return worker.station >= 0): continue
-		if game.boxes.min() == 0 and game.tasks[4].is_empty():
-			activity.action("station:4")
-			continue
-		for i in range(game.queue.size()):
-			var person: Dictionary = game.queue[i]
-			var needs: Array = game.REQUESTS[person.kind][1]
-			var station: int = 0 if person.step < 0 else needs[person.step]
-			if person.assigned or not game.tasks[station].is_empty(): continue
-			activity.action("person:%d"%i)
-			activity.action("station:%d"%station)
-			break
-	assert(game.served >= 6 and game.assisted > 0 and game.active_time >= 195)
+	extract(activity)
+	assert(not game.tutorial and game.stage==0)
+	assert(activity.begin_aim(game.piece,6))
+	activity.aim(Vector2(0,-72),6)
+	activity.release_aim(6)
+	assert(game.errors==1 and game.stage==0 and not game.grabbed)
+	assert(activity.begin_aim(game.piece,6))
+	game.cancel(6)
+	assert(not game.closed and not game.grabbed)
+	for i in range(5): extract(activity)
+	assert(game.report and game.stage==5 and game.errors==1)
 
+func extract(activity) -> void:
+	var game = activity.session
+	var path: Array = game.path.duplicate()
+	var from: Vector2 = game.piece
+	assert(activity.begin_aim(from,6))
+	for point: Vector2 in path:
+		activity.aim(point-from,6)
+		assert(game.grabbed)
+		from = point
+	activity.release_aim(6)
 
-func verify_tradeoffs(factory) -> void:
-	var run = factory.new()
-	run.start("asamblea", "", 85)
-	var assembly = run.session
-	assembly.selected.assign([0,6])
-	assert(assembly.effects()[0] == 3)
-	assembly.selected.assign([1,5])
-	assert(assembly.effects()[1] == 4)
-	run.start("accesibilidad", "Acceso", 42)
-	var access = run.session
-	assert(access.lane_supply == 15)
-	var ordinary: Array = access.route(Vector2i(0,4), Vector2i(7,4), 0)
-	assert(not ordinary.is_empty())
-	for point in ordinary:
-		assert(not access.furniture.has(point))
-	run.start("redes", "", 88)
-	var photo = run.session
-	run.action("capture")
-	run.tick(7)
-	run.action("capture")
-	run.action("gallery")
-	var subject: int = photo.gallery[0].subject
-	while photo.caption != subject: run.action("caption")
-	run.action("publish")
-	run.action("gallery")
-	run.action("publish")
-	assert(photo.posts.size() == 1)
-	run.start("seguridad", "", 94)
-	var security = run.session
-	security.tutorial = false
-	security.incidents[0] = {"id":17,"type":5,"observed":false,"deadline":30.0,"progress":0.0,"support":false}
-	security.next_event = 40
-	run.action("observe:0")
-	run.action("send")
-	for i in range(40): run.tick(0.25)
-	assert(security.unfair == 1 and security.resolved == 0)
-	run.start("convivencia", "", 46)
-	var mediation = run.session
-	run.action("topic:0")
-	run.action("person:1")
-	run.action("topic:0")
-	assert(not mediation.tutorial)
-	run.action("break")
-	run.action("break")
-	assert(mediation.last_outcome == "Derivado a seguimiento")
-	run.start("sanitario", "Cuidados", 19)
-	var clinic = run.session
-	assert(clinic.boxes[2] == 3)
-	run.action("station:0")
-	clinic.boxes = [0,0,0]
-	run.action("station:4")
-	assert(not clinic.tasks[0].is_empty() and not clinic.tasks[4].is_empty())
-	for i in range(40): run.tick(0.25)
-	assert(clinic.boxes[0] == 2 and clinic.boxes[2] == 1)
-	clinic.finish(75, "Resultado de prueba")
-	run.action("retry")
-	assert(run.mode == "sanitario" and run.session.tutorial and not run.done and run.session.boxes[2] == 3)
+func play_access(activity) -> void:
+	var game = activity.session
+	var shortcuts: Array = game.narrow.keys()
+	assert(not shortcuts.is_empty() and game.walkable(shortcuts[0],true) and not game.walkable(shortcuts[0],false))
+	assert(not game.walkable(Vector2i(0,0),true))
+	var first_route: Array = game.find_route(game.player,game.destination,false)
+	var step: Vector2 = first_route[1]-first_route[0]
+	assert(activity.begin_aim(game.JOY+step*28,3))
+	activity.tick(0.03)
+	activity.release_aim(3)
+	assert(game.player==first_route[1] and not game.tutorial)
+	for round_index in range(3):
+		var route: Array = game.find_route(game.player,game.destination,false)
+		assert(route.size()>1)
+		for i in range(1,route.size()):
+			var direction = route[i]-route[i-1]
+			var index: int = game.DIRS.find(direction)
+			activity.action(["right","down","left","up"][index])
+			activity.tick(0.16)
+			activity.tick(0.20)
+			assert(game.walkable(game.guest,false))
+		for i in range(15):
+			if game.stage>round_index: break
+			activity.tick(0.23)
+		assert(game.stage==round_index+1)
+	assert(game.report and game.separated==0)

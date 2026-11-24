@@ -12,7 +12,7 @@ const PACKAGES := [
 	["Ruta señalizada", [2,0,1,0], [1,0,1]],
 	["Mesa informativa", [0,0,2,1], [0,1,1]],
 ]
-const EVENTS := ["Primera llegada", "Zona de paso estrecha", "Turnos de tarde", "Aviso a la plaza", "Descanso y relevo", "Acuerdo final"]
+const EVENTS := ["Redes · información", "Seguridad · avisos", "Convivencia · material", "Punto sanitario · apoyo", "Accesibilidad · recorridos", "Acuerdo final"]
 var participants: Array[Dictionary] = []
 var options: Array = []
 var selected: Array[int] = []
@@ -32,7 +32,7 @@ var vote_timer := 0.0
 func initialize(seed_value: int, plan: String) -> void:
 	super.initialize(seed_value,plan)
 	title = "Segunda asamblea"
-	help = "Toca a dos delegados para escuchar sus prioridades. Luego combina propuestas dentro del presupuesto."
+	help = "Redes, Seguridad, Convivencia, Punto sanitario y Accesibilidad. Escucha a dos delegados y prepara las prioridades."
 	for i in range(4):
 		participants.append({"first":i,"second":(i+1+rng.randi_range(0,2))%4,"trust":1})
 	setup_agenda()
@@ -130,7 +130,7 @@ func advance(delta: float) -> void:
 	if chapter == EVENTS.size():
 		var best := tally.find(tally.max())
 		result.plan = AXES[best]
-		finish(score, "Prioridad acordada: %s. Apoyos acumulados %d/24. La prioridad cambia la reserva inicial de su comisión." % [AXES[best],consensus])
+		finish(score, "Prioridad acordada: %s. Apoyos acumulados %d/24. Redes abre la primera ronda de llegadas." % [AXES[best],consensus])
 	else:
 		setup_agenda()
 
