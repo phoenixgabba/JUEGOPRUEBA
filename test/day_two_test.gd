@@ -50,6 +50,9 @@ func run() -> void:
 		assert(main.s.next_day_two_commission() == i)
 		main.s.player = main.DayTwo.POINTS[i]
 		main.interact()
+		if i == CampState.NETWORKS:
+			assert(main.phone_ui.shown and main.phone_ui.at == "social")
+			main.launch_network_from_phone()
 		assert(main.day_two_open and main.commission_open)
 		match i:
 			0: play_photo(activity)
@@ -76,12 +79,13 @@ func run() -> void:
 	assert(restored.assembly_plan == main.s.assembly_plan)
 	assert(restored.media_count == 3 and restored.posts.size() == 3 and restored.day_two_completed == 31)
 	main.open_phone()
-	assert(activity.mode == "perfil")
-	activity.action("next")
-	assert(activity.session.view_index == 1)
+	main.phone_ui.navigate("social","campaign:0")
+	assert(main.phone_ui.shown and main.phone_ui.at == "social")
+	assert(restored.phone.data.photos.size() == 3)
+	main.phone_ui.close()
 	var normal_save := FileAccess.get_file_as_string(CampState.SAVE_PATH)
 	main.test_build = true
-	for checkpoint in range(13):
+	for checkpoint in range(14):
 		main.load_checkpoint(checkpoint)
 		assert(main.s.practice)
 		main.s.save_game()

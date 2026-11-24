@@ -12,6 +12,12 @@
       "path": "res://test/day_two_test.gd",
       "expect": "[day-two] PASS:",
       "profile": "source"
+    },
+    {
+      "kind": "script",
+      "path": "res://test/phone_test.gd",
+      "expect": "[phone] PASS:",
+      "profile": "source"
     }
   ]
 }

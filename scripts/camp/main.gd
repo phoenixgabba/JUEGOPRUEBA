@@ -39,6 +39,8 @@ var joystick_radius := 1.0
 var joystick_vector := Vector2.ZERO
 var elapsed := 0.0
 const CUE = preload("res://scripts/manus/procedural_sfx.gd")
+const PhoneStory = preload("res://scripts/camp/phone/story.gd")
+var phone_ui := preload("res://scripts/camp/phone/device.gd").new()
 var activity_sound := AudioStreamPlayer.new()
 var activity_sounds: Dictionary = {}
 var rest_time := -1.0
@@ -66,7 +68,7 @@ func _ready() -> void:
 	if test_build: screen = "selector"
 	touch_layout = DisplayServer.is_touchscreen_available()
 	if OS.has_feature("web"):
-		touch_layout = touch_layout or JavaScriptBridge.eval("matchMedia('(any-pointer: coarse)').matches") == true
+		touch_layout = touch_layout or bool(JavaScriptBridge.eval("matchMedia('(any-pointer: coarse)').matches"))
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	activity_sounds = {
 		"asamblea": CUE.tone(430, 0.15, 0.12, 580),
@@ -77,12 +79,32 @@ func _ready() -> void:
 		"sanitario": CUE.tone(570, 0.13, 0.11, 815),
 	}
 	add_child(activity_sound)
+	add_child(phone_ui)
+	phone_ui.setup(self)
+	phone_ui.reset(s.phone)
 	set_process(true)
 	set_process_input(true)
 	queue_redraw()
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	var phone_available := can_open_phone()
+	if phone_available or phone_ui.shown:
+		PhoneStory.sync(s.phone,s.day,s.phase,s.commissions,s.day_two_completed)
+		if s.commissions>=1 and s.phone.data.contacts.has("Alejandro") and not s.phone.seen("call:org"):
+			phone_ui.start_call("Alejandro",true)
+		s.phone.tick(delta,s.day,s.clock_hour())
+	phone_ui.step(delta,phone_available)
+	if phone_ui.progress>0 or phone_ui.shown:
+		reset_joystick()
+		walking = false
+		if s.phone.changed:
+			save_timer += delta
+			if save_timer>3:
+				s.save_game()
+				save_timer = 0
+		queue_redraw()
+		return
 	evening_shade = move_toward(evening_shade, s.light_level(), delta * 0.16)
 	if toast_time > 0: toast_time -= delta
 	if paused or dialogue or mini or map_open or commission_open or screen != "play":
@@ -267,7 +289,11 @@ func interact_day_two() -> bool:
 	var index := s.next_day_two_commission()
 	if index < 0 or s.player.distance_to(DayTwo.POINTS[index]) > 42:
 		return false
-	open_day_two_activity(DayTwo.KINDS[index])
+	if index == State.NETWORKS:
+		open_phone()
+		phone_ui.navigate("social")
+	else:
+		open_day_two_activity(DayTwo.KINDS[index])
 	return true
 
 func open_day_two_activity(kind: String) -> void:
@@ -289,6 +315,12 @@ func complete_day_two_activity() -> void:
 	if index == State.NETWORKS:
 		s.media_count = DayTwo.MEDIA.size()
 		s.posts = day_two_activity.published.duplicate(true)
+		s.phone.import_campaign(s.posts)
+		for post_index in range(s.posts.size()):
+			var key := "campaign:%d"%post_index
+			s.phone.comment(key,"Comunicación","Publicación incorporada al perfil de la acampada.")
+		if s.phone.data.contacts.has("Patricia") and not "Patricia" in s.phone.data.followers:
+			s.phone.data.followers.append("Patricia")
 	s.respect += day_two_activity.session.score / 10
 	if index == 2: s.wellbeing = clampi(s.wellbeing + (day_two_activity.session.score - 50) / 5, 0, 100)
 	s.finish_day_two_commission(index)
@@ -303,12 +335,24 @@ func complete_day_two_activity() -> void:
 	]
 	open_dialog(DayTwo.NAMES[index].to_upper(), messages[index])
 
+func can_open_phone() -> bool:
+	return screen == "play" and rest_time < 0 and s.phase != "wake" and not paused and not dialogue and not commission_open and not mini and not map_open
+
 func open_phone() -> void:
-	if not s.has_day_two_commission(State.NETWORKS) or dialogue:
-		return
-	commission_open = true
-	day_two_open = true
-	day_two_activity.open_profile(s.posts)
+	if not can_open_phone(): return
+	reset_joystick()
+	s.phone.import_campaign(s.posts)
+	phone_ui.open()
+
+func network_assignment_available() -> bool:
+	return s.day == 2 and s.phase == "commissions_two" and s.next_day_two_commission() == State.NETWORKS and s.player.distance_to(DayTwo.POINTS[State.NETWORKS]) <= 42
+
+func launch_network_from_phone() -> void:
+	if not phone_ui.shown or not network_assignment_available(): return
+	phone_ui.close()
+	phone_ui.progress = 0
+	phone_ui.hide()
+	open_day_two_activity("redes")
 
 func keep_clear_of_new_shelters() -> void:
 	if walkable(s.player):
@@ -332,6 +376,7 @@ func start_game(resume: bool) -> void:
 		s.reset_save()
 		s.save_game()
 		arrivals = []
+	phone_ui.reset(s.phone)
 	evening_shade = s.light_level()
 	screen = "play"
 	map_open = false
@@ -474,6 +519,7 @@ func interact_with_delivery() -> bool:
 	return true
 
 func talk_to(n: String) -> void:
+	PhoneStory.talk(s.phone,n)
 	if s.phase == "talk" and not s.talked[n]:
 		s.talked[n] = true
 		s.respect += 10
@@ -724,7 +770,7 @@ func draw_hud() -> void:
 		text(Vector2(32,62), "DÍA %d · %s · %02d:00" % [s.day, s.daylight(), s.clock_hour()], 13, Color("fff3d9"), true)
 		text(Vector2(225,51), "VIDA %d    ENERGÍA %d    RESPETO %d    CAJA %d €    RECURSOS %d    BIENESTAR %d    PERSONAS %d" % [s.health,s.energy,s.respect,s.cash,s.resources(),s.wellbeing,s.people], 16, Color("fff6e2"), true)
 		button(Rect2(size_v.x-105,23,76,42), "Ⅱ", "pause")
-		if s.has_day_two_commission(State.NETWORKS): button(Rect2(20,88,130,50), "Teléfono", "phone")
+		if can_open_phone(): button(Rect2(20,88,150,50), "Móvil [P]", "phone")
 		panel(Rect2(size_v.x-327,94,305,94), Color(0.12,0.23,0.19,0.91))
 		text(Vector2(size_v.x-309,121), "AHORA EN LA PLAZA", 13, Color("eac379"), true)
 		paragraph(Vector2(size_v.x-309,145), objective(), 268, 16)
@@ -835,8 +881,8 @@ func draw_mobile_controls(row: Rect2, enabled: bool) -> void:
 	var h := joystick_radius - gap * 0.5
 	var x := row.end.x - right_width
 	button(Rect2(x,top,right_width,h), "Mapa", "map", false, fs)
-	if s.has_day_two_commission(State.NETWORKS) and enabled:
-		button(Rect2(x-right_width-gap,top,right_width,h), "Teléfono", "phone", false, roundi(fs * 0.9))
+	if enabled and can_open_phone():
+		button(Rect2(x-right_width-gap,top,right_width,h), "Móvil", "phone", false, roundi(fs * 0.9))
 	button(Rect2(x,top+h+gap,right_width,h), "Acción", "action", enabled, fs)
 	if not enabled:
 		draw_rect(Rect2(x,top,right_width,joystick_radius * 2), Color(0.05,0.11,0.09,0.45))
@@ -1059,6 +1105,14 @@ func tarp_drag_point(pos: Vector2) -> Vector2:
 	return point
 
 func _input(event: InputEvent) -> void:
+	if phone_ui.shown or phone_ui.progress>0:
+		if event is InputEventKey and event.pressed and not event.echo:
+			if event.keycode == KEY_ESCAPE: phone_ui.back()
+			elif event.keycode == KEY_P and not get_viewport().gui_get_focus_owner() is LineEdit: phone_ui.close()
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_P and can_open_phone():
+		open_phone()
+		return
 	if rest_time >= 0: return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if commission_open and not paused:
@@ -1176,7 +1230,7 @@ func pointer_up(_pos: Vector2, index: int) -> void:
 
 func draw_selector() -> void:
 	draw_texture_rect(COVER, Rect2(Vector2.ZERO, size_v), false)
-	var labels := ["Cierre del Día 1", "Regreso a tu tienda", "Entrar y descansar", "Amanecer", "Segunda asamblea"] + DayTwo.NAMES + ["Montaje de tienda", "Almacén", "Cocina"]
+	var labels := ["Cierre del Día 1", "Regreso a tu tienda", "Entrar y descansar", "Amanecer", "Segunda asamblea"] + DayTwo.NAMES + ["Montaje de tienda", "Almacén", "Cocina", "Teléfono y aplicaciones"]
 	var cols := 2 if size_v.x > size_v.y else 1
 	var layout := Vector2(430 * cols + 20, 78 + ceili(float(labels.size()) / cols) * 58)
 	mini_scale = minf((size_v.x - 20) / layout.x, (size_v.y - 20) / layout.y)
@@ -1191,9 +1245,10 @@ func draw_selector() -> void:
 	draw_set_transform(Vector2.ZERO)
 
 func load_checkpoint(index: int) -> void:
-	if not test_build or index < 0 or index > 12: return
+	if not test_build or index < 0 or index > 13: return
 	s = State.new()
 	s.practice = true
+	phone_ui.reset(s.phone)
 	s.tents = 25
 	s.commissions = 3
 	s.material_boxes = 4
@@ -1209,7 +1264,14 @@ func load_checkpoint(index: int) -> void:
 	day_two_open = false
 	rest_time = -1
 	screen = "play"
-	if index == 0:
+	if index == 13:
+		s.day = 2
+		s.phase = "meeting_two"
+		for person in ["Patricia","Alejandro","Marina"]: PhoneStory.talk(s.phone,person)
+		PhoneStory.sync(s.phone,s.day,s.phase,s.commissions,s.day_two_completed)
+		phone_ui.open()
+		phone_ui.start_call("Alejandro",true)
+	elif index == 0:
 		s.phase = "expansion"
 		s.delivery = "close"
 	elif index == 2 or index == 3:

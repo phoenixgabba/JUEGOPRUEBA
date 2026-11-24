@@ -2,6 +2,7 @@ extends RefCounted
 class_name CampState
 
 const SAVE_PATH := "user://acampada-day1-v2.json"
+var phone := preload("res://scripts/camp/phone/data.gd").new()
 var practice := false
 var day := 1
 const DAY_TWO_ORDER := [4, 0, 1, 2, 3]
@@ -75,11 +76,14 @@ func resources() -> int:
 	return total if build_stage == 0 else 0
 
 func save_game() -> void:
-	if practice: return
+	if practice:
+		phone.changed = false
+		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null: return
-	f.store_string(JSON.stringify({"version":4,"day_two_completed":day_two_completed,"day":day,"day_two_commissions":day_two_commissions,"media_count":media_count,"posts":posts,"assembly_plan":assembly_plan,"phase":phase,"talked":talked,"collected":collected,"build_stage":build_stage,"respect":respect,"energy":energy,"health":health,"wellbeing":wellbeing,"cash":cash,"people":people,"capacity":capacity,"tents":tents,"pitch_swaps":pitch_swaps,"commissions":commissions,"delivery":delivery,"delivery_progress":delivery_progress,"material_boxes":material_boxes,"choice":choice,"x":player.x,"y":player.y,"minutes":minutes}))
+	f.store_string(JSON.stringify({"version":4,"phone":phone.data,"day_two_completed":day_two_completed,"day":day,"day_two_commissions":day_two_commissions,"media_count":media_count,"posts":posts,"assembly_plan":assembly_plan,"phase":phase,"talked":talked,"collected":collected,"build_stage":build_stage,"respect":respect,"energy":energy,"health":health,"wellbeing":wellbeing,"cash":cash,"people":people,"capacity":capacity,"tents":tents,"pitch_swaps":pitch_swaps,"commissions":commissions,"delivery":delivery,"delivery_progress":delivery_progress,"material_boxes":material_boxes,"choice":choice,"x":player.x,"y":player.y,"minutes":minutes}))
 	f.close()
+	phone.changed = false
 
 func load_game() -> bool:
 	if not FileAccess.file_exists(SAVE_PATH): return false
@@ -87,6 +91,7 @@ func load_game() -> bool:
 	if f == null: return false
 	var d = JSON.parse_string(f.get_as_text())
 	if not d is Dictionary or int(d.get("version", 0)) not in [1, 2, 3, 4]: return false
+	phone.restore(d.get("phone", {}))
 	day = clampi(int(d.get("day", 1)), 1, 2)
 	day_two_commissions = clampi(int(d.get("day_two_commissions", 0)), 0, 5)
 	# Earlier Day 2 saves opened Redes through Accesibilidad in index order.
