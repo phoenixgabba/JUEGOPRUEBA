@@ -91,9 +91,9 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	var phone_available := can_open_phone()
-	if phone_available or phone_ui.shown:
+	if phone_safe_window() or phone_ui.shown:
 		PhoneStory.sync(s.phone,s.day,s.phase,s.commissions,s.day_two_completed)
-		if s.commissions>=1 and s.phone.data.contacts.has("Alejandro") and not s.phone.seen("call:org"):
+		if phone_available and s.commissions>=1 and s.phone.data.contacts.has("Alejandro") and not s.phone.seen("call:org"):
 			phone_ui.start_call("Alejandro",true)
 		s.phone.tick(delta,s.day,s.clock_hour())
 	phone_ui.step(delta,phone_available)
@@ -349,7 +349,10 @@ func finish_new_commission(index: int, detail: String = "") -> void:
 
 func can_open_phone() -> bool:
 	var unlocked: bool = s.phone.data.unlocks.get("phone",false) or s.has_day_two_commission(State.NETWORKS)
-	return unlocked and screen == "play" and rest_time < 0 and s.phase != "wake" and not paused and not dialogue and not commission_open and not mini and not map_open
+	return unlocked and phone_safe_window()
+
+func phone_safe_window() -> bool:
+	return screen == "play" and rest_time < 0 and s.phase != "wake" and not paused and not dialogue and not commission_open and not mini and not map_open
 
 func open_phone() -> void:
 	if not can_open_phone(): return
