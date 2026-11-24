@@ -43,6 +43,12 @@ const CROWD_ART := preload("res://assets/acampada/crowd_people.svg")
 
 const CROWD_NAMES := ["Tomi","Vicent","Amina","Pau","Cleo","Julian","Rosa","Marc","Carles","Hugo","Anna","Irene","Óscar","Lulu","Dan","David","Àlex"]
 const CORE_NAMES := ["Patricia","Alejandro","Marina"]
+# Identidad narrativa de los NPC ficticios; no se deduce de su aspecto.
+const CROWD_GENDERS := ["nb","m","w","w","w","m","w","m","m","w","w","w","w","nb","nb","w","nb"]
+const ARRIVAL_ORDER := [2,4,0,6,1,10,11,13,3,5,9,12,14,15,7,8,16]
+
+static func arrival_variant(index: int) -> int:
+	return ARRIVAL_ORDER[posmod(index,ARRIVAL_ORDER.size())]
 const MAX_TENTS := 800
 const TENT_GROUND := Vector2(9, 5)
 const TENT_SIZE := Vector2(23, 21)
@@ -337,13 +343,13 @@ func draw(c: Control, s: CampState, rect: Rect2, t: float, walking: bool, arriva
 			"leaving": pos = delivery_point(s, crowd_position(s.tents - 1, s), ENTRANCE)
 			"returning": pos = delivery_point(s, ENTRY_APPROACH, ENTRANCE)
 			"placing": pos = delivery_point(s, ENTRANCE, next_pitch(s))
-		actors.append({"pos":pos, "crowd":posmod(s.tents - 1,CROWD_NAMES.size()), "walking":s.delivery in ["leaving", "returning", "placing"]})
+		actors.append({"pos":pos, "crowd":(posmod(s.tents - 1,CROWD_NAMES.size()) if s.tents <= 5 else arrival_variant(s.tents - 6)), "walking":s.delivery in ["leaving", "returning", "placing"]})
 	if s.day == 2 and s.delivery == "delegated":
 		var guest := delivery_point(s, ENTRY_APPROACH, next_pitch(s))
-		actors.append({"pos":guest, "crowd":posmod(s.tents,CROWD_NAMES.size()), "walking":true})
+		actors.append({"pos":guest, "crowd":arrival_variant(s.tents - 6), "walking":true})
 		actors.append({"pos":clear_spot(guest + Vector2(-12, 4), s), "tex":MARINA, "walking":true})
 	for i in range(arrival_positions.size()):
-		actors.append({"pos":arrival_positions[i], "crowd":posmod(s.tents+i,CROWD_NAMES.size())})
+		actors.append({"pos":arrival_positions[i], "crowd":arrival_variant(s.tents+i-6)})
 	for i in range(pitch_count(s)):
 		actors.append({"pos": pitch_at(s, i), "pitch": i})
 	actors.sort_custom(func(a, b): return a.pos.y < b.pos.y)
@@ -435,4 +441,4 @@ func draw_crowd_actor(c: Control,pos: Vector2,index: int,t: float,walking: bool)
 	c.draw_circle(pos,4,Color(0.16,0.14,0.10,0.27))
 	var bob := sin(t * 9.0 + pos.x) * 0.5 if walking else sin(t * 1.7 + pos.x) * 0.15
 	var frame := posmod(index,CROWD_NAMES.size())
-	c.draw_texture_rect_region(CROWD_ART,Rect2(pos+Vector2(-5,-16+bob),Vector2(10,17)),Rect2(frame*64,0,64,112))
+	c.draw_texture_rect_region(CROWD_ART,Rect2(pos+Vector2(-5,-16+bob),Vector2(10,17)),Rect2(frame*32,0,32,56))
