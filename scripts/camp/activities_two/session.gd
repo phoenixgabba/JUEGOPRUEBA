@@ -12,6 +12,7 @@ var active_time := 0.0
 var score := 0
 var done := false
 var cue := false
+var fault_cue := false
 var tutorial := true
 var report := false
 var notice := ""
@@ -56,12 +57,14 @@ func trained() -> void:
 func finish(points: int, details: String) -> void:
 	score = clampi(points, 0, 100)
 	summary = details
+	fault_cue = false
 	report = true
 	cue = true
 
-func feedback(message: String, point: Vector2 = Vector2(220, 230)) -> void:
+func feedback(message: String, point: Vector2 = Vector2(220, 230), fault: bool = false) -> void:
 	notice = message
 	cue = true
+	fault_cue = fault
 	bursts.append({"p":point, "time":clock})
 
 func key(code: int) -> void:
@@ -77,6 +80,14 @@ func move(delta: Vector2, index: int) -> void:
 	if index != drag_id: return
 	drag_cursor += delta
 	move_drag(delta)
+
+func cancel(index: int) -> void:
+	if index != drag_id: return
+	drag_id = -2
+	cancel_drag()
+
+func cancel_drag() -> void:
+	end_drag(drag_cursor)
 
 func release(index: int) -> void:
 	if index != drag_id: return

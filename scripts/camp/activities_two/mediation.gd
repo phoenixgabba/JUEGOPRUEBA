@@ -1,179 +1,133 @@
 extends "res://scripts/camp/activities_two/session.gd"
 
-const CASES := [
-	[["Ana","Pau"],["El grupo necesita ensayar.","El ruido atraviesa la tienda."],["El local se cierra al anochecer.","Su turno empieza a las seis."],["Lugar","Horario"],["Junto al círculo","Patio lateral","Fuera de la plaza"],["Por la tarde","Al atardecer","Por la noche"]],
-	[["Omar","Berta"],["Hay que repartir agua a toda la fila.","No puede esperar mucho de pie."],["La entrada se atasca si la fila se duplica.","Puede recoger también para su compañera."],["Recogida","Turno"],["Ventanilla","Dos puntos","Reparto móvil"],["Fila única","Franjas","Con acompañante"]],
-	[["Lola","Iker"],["Necesita las cajas a mano.","Hay que liberar la salida de la tienda."],["Las cajas salen una a una durante el día.","Pasa con un carro más ancho por la tarde."],["Almacén","Carga"],["En la esquina","En los bancos","En el refugio"],["Todo el día","Ventanas cortas","Por turnos"]],
-	[["Sira","Teo"],["Su grupo usa las mantas para el relevo.","Las personas nuevas esperan material."],["Parte del turno acaba antes de la cena.","Solo algunas llegadas requieren espera."],["Reserva","Entrega"],["Por grupos","Individual","En depósito"],["Al llegar","Tras el relevo","Con cita"]],
-	[["Aina","Bilal"],["El tablero debe ser visible.","Quieren conservar la entrada despejada."],["Los avisos deben cambiar cada hora.","La entrada alternativa es más ancha."],["Ubicación","Carteles"],["Puerta","Banco","Pasillo ancho"],["Solo urgentes","Dos paneles","Rotativos"]],
-]
-var order: Array = []
-var chapter := 0
-var person := 0
-var trust := [0,0]
-var tension := 2
-var seen := [0,0]
-var interests := [[0,0],[0,0]]
-var style := [0,0]
-var terms := [0,0]
-var offer_history: Array = []
-var turn_cost := 0
-var agreements := 0
-var reached := 0
-var listening := true
-var last_outcome := ""
-var transcript: Array[String] = []
+const ITEMS := ["Tienda","Mesa","Lona","Piquetas","Varillas","Manta","Cantimplora","Mochila","Megáfono","Linterna"]
+const GRID := Vector2(20,88)
+const AREA := Vector2(400,311)
+var deck: Array[int] = []
+var matched: Dictionary = {}
+var opened: Array[int] = []
+var turnover: Dictionary = {}
+var flip_back := 0.0
+var stage := 0
+var next_board := 0.0
+var attempts := 0
+var errors := 0
+var pairs := 0
 
-func initialize(seed_value: int,plan: String) -> void:
+func initialize(seed_value: int, plan: String) -> void:
 	super.initialize(seed_value,plan)
-	title = "Convivencia · mesa de diálogo"
-	help = "Habla con cada persona. Pregunta por el límite o refleja lo que has oído para abrir una segunda rama."
-	order = range(CASES.size())
-	for i in range(order.size()-1,0,-1):
+	title = "Convivencia · parejas de la plaza"
+	help = "Voltea dos cartas de ensayo y encuentra una pareja. Luego comienza el tablero puntuado."
+	deal(2)
+
+func deal(count: int) -> void:
+	deck.clear()
+	matched.clear()
+	opened.clear()
+	turnover.clear()
+	flip_back = 0
+	for i in range(count):
+		var item := (i+stage*2)%ITEMS.size()
+		deck.append_array([item,item])
+	for i in range(deck.size()-1,0,-1):
 		var j := rng.randi_range(0,i)
-		var previous: int = order[j]
-		order[j] = order[i]
-		order[i] = previous
-	if plan == "Descanso": turn_cost = -1
-	setup_case()
+		var value := deck[j]
+		deck[j] = deck[i]
+		deck[i] = value
 
-func case_data() -> Array:
-	return CASES[order[mini(chapter,order.size()-1)]]
-
-func setup_case() -> void:
-	tension = 2+int(chapter>=2)
-	trust = [0,0]
-	seen = [0,0]
-	terms = [0,0]
-	person = 0
-	listening = true
-	offer_history.clear()
-	transcript.assign([case_data()[1][0],case_data()[1][1]])
-	for i in range(2):
-		interests[i] = [rng.randi_range(0,2),rng.randi_range(0,2)]
-		style[i] = (i+chapter)%2
-
-func add_line(line: String) -> void:
-	transcript.append(line)
-	while transcript.size()>2: transcript.pop_front()
-
-func speak(topic: int) -> void:
-	var side := person
-	var flag := 1 << topic
-	if seen[side] & flag:
-		add_line("«Ya lo hemos hablado. Puedes reformular o volver a la propuesta.»")
-		return
-	seen[side] |= flag
-	turn_cost += 1
-	var data := case_data()
-	match topic:
-		0:
-			trust[side] += 1
-			add_line("«Gracias por escuchar. "+data[1][side]+"»")
-		1:
-			var axis: int = style[side]
-			if trust[side]==0 and tension>=3:
-				seen[side] &= ~flag
-				add_line("«Prefiero explicar primero qué me preocupa.»")
-				tension = mini(6,tension+1)
-			else:
-				var choice: String = data[4+axis][interests[side][axis]]
-				add_line("«"+data[2][side]+" Me importa mantener: "+choice+".»")
-		2:
-			var axis: int = 1-style[side]
-			if trust[side] == 0:
-				add_line("«Si acordamos un ensayo, podemos revisar cómo funciona.»")
-			else:
-				trust[side] += 1
-				tension = maxi(0,tension-1)
-				add_line("«Puedo ceder si el primer ensayo incluye: "+str(data[4+axis][interests[side][axis]])+".»")
-	if seen[0]>0 and seen[1]>0: trained()
-
-func evaluate(temporary: bool) -> void:
-	if tutorial: return
-	var key := "%s:%s" % [terms,temporary]
-	if key in offer_history:
-		feedback("Ese acuerdo ya se discutió. Cambia alguna condición o plantea un piloto.")
-		return
-	offer_history.append(key)
-	var votes := 0
-	var data := case_data()
-	for i in range(2):
-		var axis: int = style[i]
-		var principal := int(terms[axis] == interests[i][axis])
-		var extra := int(terms[1-axis] == interests[i][1-axis])
-		var accept: bool = principal*3 + extra*2 + trust[i] + (2 if temporary else 0) >= 4+int(tension>=4)
-		if accept: votes += 1
-		else: add_line("«%s: me falta una garantía sobre %s.»"%[data[0][i],data[3][axis].to_lower()])
-	if votes == 2:
-		agreements += 1
-		reached += 11 if temporary else 17
-		resolve_case("Piloto con revisión" if temporary else "Pacto estable")
-	else:
-		tension = mini(6,tension+1)
-		reached += votes
-		feedback("%d de 2 apoyos. Puedes retomar la conversación o pausar."%votes)
-
-func resolve_case(outcome: String) -> void:
-	last_outcome = outcome
-	chapter += 1
-	score = clampi(reached + agreements*3-maxi(0,turn_cost-25),0,100)
-	feedback(outcome,Vector2(215,260))
-	if chapter>=order.size():
-		finish(score,"%d acuerdos de 5. Último desenlace: %s. El clima de la plaza refleja los acuerdos alcanzados."%[agreements,last_outcome])
-	else:
-		setup_case()
+func tick(delta: float) -> void:
+	super.tick(delta)
+	if report: return
+	if flip_back>0 and clock>=flip_back:
+		for index in opened: turnover[index] = {"at":clock,"face":false}
+		opened.clear()
+		flip_back = 0
+	if next_board>0 and clock>=next_board:
+		next_board = 0
+		if tutorial:
+			trained()
+			deal(4)
+			feedback("Encuentra todas las parejas. Cada tablero añade cartas.")
+		else:
+			stage += 1
+			if stage==3:
+				finish(clampi(100-errors*3-maxi(0,roundi(active_time)-50),0,100), "%d parejas · %d intentos · %d fallos · %.1f s."%[pairs,attempts,errors,active_time])
+			else: deal([4,6,10][stage])
 
 func perform(value: String) -> void:
-	var parts := value.split(":")
-	match parts[0]:
-		"person": person = int(parts[1])
-		"topic": speak(int(parts[1]))
-		"talk": listening = not listening
-		"term":
-			var i := int(parts[1])
-			terms[i] = (terms[i]+1)%3
-		"pilot": evaluate(true)
-		"commit": evaluate(false)
-		"break":
-			if tension>1 and trust[0]+trust[1]>=1:
-				tension = maxi(0,tension-2)
-				turn_cost += 2
-				feedback("Pausa compartida. Baja la tensión sin perder el turno.")
-			else:
-				resolve_case("Derivado a seguimiento")
+	if not value.begins_with("card:") or next_board>0 or opened.size()==2: return
+	var index := int(value.get_slice(":",1))
+	if index not in range(deck.size()) or matched.has(index) or index in opened: return
+	opened.append(index)
+	turnover[index] = {"at":clock,"face":true}
+	if opened.size()!=2: return
+	if not tutorial: attempts += 1
+	if deck[opened[0]]==deck[opened[1]]:
+		for card in opened: matched[card] = true
+		opened.clear()
+		if not tutorial: pairs += 1
+		feedback("Pareja encontrada", card_rect(index).get_center())
+		if matched.size()==deck.size() or tutorial: next_board = clock+0.65
+	else:
+		if not tutorial: errors += 1
+		flip_back = clock+0.82
+		feedback("Prueba con otra pareja.", card_rect(index).get_center(),true)
+
+func card_rect(index: int) -> Rect2:
+	var columns := 5 if deck.size()>12 else 4
+	var rows := ceili(float(deck.size())/columns)
+	var tile := AREA/Vector2(columns,rows)
+	return Rect2(GRID+Vector2(index%columns,index/columns)*tile+Vector2(3,4),tile-Vector2(6,8))
 
 func status() -> String:
-	return "Mesa %d/5    •    %d acuerdos    •    %d puntos"%[mini(chapter+1,5),agreements,score]
+	return "Tablero %d/3  •  %d parejas  •  %d intentos  •  %.1fs"%[mini(stage+1,3),pairs,attempts,active_time]
 
 func scene(game: Control) -> void:
-	var data := case_data()
-	backdrop(game,Vector2(795,429),Color(0.24,0.12,0.09,0.32))
-	item(game,game.World.TABLE,Vector2(220,237),Vector2(132,95))
-	for i in range(2):
-		var p := Vector2(101+236*i,230)
-		actor(game,p,i+chapter,1.25)
-		game.draw_rect(Rect2(p+Vector2(-57,3),Vector2(114,31)),INK)
-		game.text(p+Vector2(-53,25),data[0][i],18,GOLD if person==i else CREAM,true,106,HORIZONTAL_ALIGNMENT_CENTER)
-		hit(game,Rect2(p+Vector2(-66,-67),Vector2(131,104)),"person:%d"%i)
-	game.draw_rect(Rect2(24,275,392,121),Color(INK,0.94))
-	for i in range(transcript.size()):
-		label(game,Vector2(34,298+42*i),transcript[i],369,GOLD if i==1 else CREAM)
-	game.text(Vector2(34,385),"Tensión",14,CREAM)
-	meter(game,Vector2(100,378),120,tension/6.0,RED)
-	game.text(Vector2(235,385),"Confianza %d / %d"%trust,14,GREEN)
+	backdrop(game,Vector2(795,429),Color(0.15,0.18,0.12,0.25))
+	for i in range(deck.size()):
+		var r := card_rect(i)
+		var facing := matched.has(i) or i in opened
+		var flip := 1.0
+		if turnover.has(i):
+			var progress := clampf((clock-turnover[i].at)/0.22,0,1)
+			flip = maxf(0.05,absf(1-2*progress))
+			if progress<0.5: facing = not turnover[i].face
+		var display := Rect2(r.get_center()-Vector2(r.size.x*flip,r.size.y)/2,Vector2(r.size.x*flip,r.size.y))
+		game.draw_rect(display,Color("e0d5ad") if facing else Color("305b51"))
+		game.draw_rect(display,GOLD if matched.has(i) else CREAM,false,2)
+		if flip>0.63:
+			if facing:
+				draw_item(game,deck[i],display.get_center()-Vector2(0,7))
+				game.text(display.position+Vector2(0,display.size.y-8),ITEMS[deck[i]],11,INK,true,display.size.x,HORIZONTAL_ALIGNMENT_CENTER)
+			else:
+				var center := display.get_center()
+				game.draw_rect(display.grow(-6),Color("8aa777"),false,1)
+				game.draw_colored_polygon(PackedVector2Array([center+Vector2(0,-17),center+Vector2(19,14),center+Vector2(-19,14)]),GOLD)
+				game.draw_line(center+Vector2(0,-17),center+Vector2(0,14),INK,2)
+		hit(game,r,"card:%d"%i)
 
-func controls(game: Control) -> void:
-	var data := case_data()
-	if listening:
-		button(game,Rect2(20,477,197,55),"Escuchar versión","topic:0")
-		button(game,Rect2(223,477,197,55),"Precisar límite","topic:1")
-		button(game,Rect2(20,541,197,55),"Explorar cesión","topic:2")
-		button(game,Rect2(223,541,197,55),"Abrir el acuerdo","talk",true)
-		button(game,Rect2(20,610,400,54),"Pausa / derivación","break")
-	else:
-		button(game,Rect2(20,471,400,48),"%s · %s"%[data[3][0],data[4][terms[0]]],"term:0")
-		button(game,Rect2(20,526,400,48),"%s · %s"%[data[3][1],data[5][terms[1]]],"term:1")
-		button(game,Rect2(20,583,197,50),"Ensayar como piloto","pilot",false,16)
-		button(game,Rect2(223,583,197,50),"Proponer pacto","commit",true,16)
-		button(game,Rect2(20,641,400,48),"Volver a escuchar","talk")
+func draw_item(game: Control, id: int, p: Vector2) -> void:
+	if id<5:
+		var graphics: Array = [game.World.TENT,game.World.TABLE,game.World.TARP,game.World.PEGS,game.World.POLES]
+		item(game,graphics[id],p,Vector2(43,39))
+		return
+	var colors := [Color("b65d59"),Color("477b9b"),Color("a36d45"),Color("7865a0"),Color("514d64")]
+	var c: Color = colors[id-5]
+	match id:
+		5:
+			game.draw_rect(Rect2(p-Vector2(17,13),Vector2(34,26)),c)
+			for i in range(3): game.draw_rect(Rect2(p+Vector2(-17,-8+7*i),Vector2(34,3)),GOLD)
+		6:
+			game.draw_rect(Rect2(p-Vector2(10,12),Vector2(20,28)),c)
+			game.draw_rect(Rect2(p-Vector2(5,17),Vector2(10,7)),INK)
+			game.draw_rect(Rect2(p-Vector2(8,3),Vector2(16,9)),Color("bde0ea"))
+		7:
+			game.draw_rect(Rect2(p-Vector2(14,13),Vector2(28,28)),c)
+			game.draw_rect(Rect2(p-Vector2(8,17),Vector2(16,5)),INK)
+			game.draw_rect(Rect2(p-Vector2(10,1),Vector2(20,9)),GOLD)
+		8:
+			game.draw_colored_polygon(PackedVector2Array([p+Vector2(-15,-7),p+Vector2(14,-17),p+Vector2(14,11),p+Vector2(-15,3)]),c)
+			game.draw_rect(Rect2(p-Vector2(7,-3),Vector2(7,11)),INK)
+		9:
+			game.draw_rect(Rect2(p-Vector2(10,9),Vector2(20,26)),c)
+			game.draw_rect(Rect2(p-Vector2(14,16),Vector2(28,9)),GOLD)

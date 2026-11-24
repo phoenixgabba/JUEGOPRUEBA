@@ -2,14 +2,10 @@ extends RefCounted
 
 const NAMES := ["Redes", "Seguridad", "Convivencia", "Punto sanitario", "Accesibilidad"]
 const POINTS := [Vector2(575,410), Vector2(710,450), Vector2(795,429), Vector2(375,455), Vector2(810,395)]
-const MEDIA_POINTS := [Vector2(575,410), Vector2(540,402), Vector2(650,454)]
-const MEDIA := ["Retrato de Patricia", "Turno de Cocina", "Llegadas a la plaza"]
 const KINDS := ["redes", "seguridad", "convivencia", "sanitario", "accesibilidad"]
 const SESSIONS := {
 	"asamblea": preload("res://scripts/camp/activities_two/assembly.gd"),
 	"accesibilidad": preload("res://scripts/camp/activities_two/access.gd"),
-	"redes": preload("res://scripts/camp/activities_two/photo.gd"),
-	"perfil": preload("res://scripts/camp/activities_two/photo.gd"),
 	"seguridad": preload("res://scripts/camp/activities_two/dispatch.gd"),
 	"convivencia": preload("res://scripts/camp/activities_two/mediation.gd"),
 	"sanitario": preload("res://scripts/camp/activities_two/clinic.gd"),
@@ -23,8 +19,6 @@ var cue: bool:
 	get: return session != null and session.cue
 	set(value):
 		if session != null: session.cue = value
-var published: Array:
-	get: return session.posts
 
 func start(kind: String, plan: String = "", seed_value: int = -1) -> void:
 	mode = kind
@@ -47,15 +41,14 @@ func key(code: int) -> void:
 func draw(game: Control) -> void:
 	session.draw(game)
 
-func open_profile(posts: Array) -> void:
-	start("perfil")
-	session.profile(posts)
-
 func begin_aim(point: Vector2, index: int) -> bool:
 	return session.press(point, index)
 
 func aim(delta: Vector2, index: int) -> void:
 	session.move(delta,index)
+
+func hover(point: Vector2) -> void:
+	if session.has_method("hover"): session.hover(point)
 
 func release_aim(index: int) -> void:
 	session.release(index)

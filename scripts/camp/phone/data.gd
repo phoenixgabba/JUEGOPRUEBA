@@ -11,7 +11,7 @@ var data := {
 	"contacts":{}, "threads":{}, "mail":[], "drafts":{}, "photos":[], "social":[],
 	"stories":[], "comments":{}, "followers":[], "agenda":{}, "notes":[], "files":{},
 	"notices":[], "calls":[], "active_call":{}, "settings":{"sound":true,"vibration":true,"notifications":true},
-	"unlocks":{}, "once":{}, "time":0.0, "next_id":1,
+	"network":{}, "profile":{}, "unlocks":{}, "once":{}, "time":0.0, "next_id":1,
 }
 
 func restore(saved: Variant) -> void:
@@ -20,6 +20,7 @@ func restore(saved: Variant) -> void:
 		if not saved.has(key): continue
 		if typeof(saved[key]) == typeof(data[key]) or key in ["time","next_id"]:
 			data[key] = saved[key]
+	if not saved.is_empty() and not saved.has("network"): data.unlocks.phone = true
 	changed = false
 
 func id() -> String:
@@ -76,12 +77,14 @@ func unlock(key: String) -> void:
 	data.unlocks[key] = true
 	changed = true
 
-func photo(image: Image) -> String:
+func photo(image: Image, mission: Dictionary = {}) -> String:
 	if image == null or image.is_empty(): return ""
 	if data.photos.filter(func(item): return item.has("jpg")).size() >= LIMIT: return ""
 	var key := id()
 	var encoded := Marshalls.raw_to_base64(image.save_jpg_to_buffer(0.78))
-	data.photos.push_front({"id":key,"jpg":encoded,"time":data.time})
+	var entry := {"id":key,"jpg":encoded,"time":data.time}
+	entry.merge(mission)
+	data.photos.push_front(entry)
 	return key
 
 func import_campaign(posts: Array) -> void:
@@ -99,7 +102,7 @@ func image_by_id(key: String) -> Image:
 	return null
 
 func delete_photo(key: String) -> bool:
-	if key.begins_with("campaign-"): return false
+	if key.begins_with("campaign-") or data.profile.get("avatar","") == key: return false
 	if data.social.any(func(post): return post.photo == key) or data.stories.any(func(story): return story.photo == key):
 		return false
 	if data.threads.values().any(func(thread): return thread.items.any(func(item): return item.attachment == "photo:"+key)):

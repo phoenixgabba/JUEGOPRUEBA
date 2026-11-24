@@ -28,6 +28,7 @@ const CAMP_EAST := Vector2(0, 0.93)
 const CAMP_SOUTH := Vector2(-2.25, 0.19)
 const DAY_ONE_TENTS := 25
 const DAY_TWO_TENTS := 50
+const Networks = preload("res://scripts/camp/activities_two/photo.gd")
 const DayTwo = preload("res://scripts/camp/day_two.gd")
 const KITCHEN_TENTS := 12
 const COMMUNICATION_TENTS := 19
@@ -213,8 +214,8 @@ func draw_pitch(c: Control, p: Vector2, index: int) -> void:
 	c.draw_texture_rect(TENT, Rect2(p - TENT_OFFSET, TENT_SIZE), false, CAMP_TINTS[index % CAMP_TINTS.size()])
 
 func npc_pos(n: String, s: CampState, t: float) -> Vector2:
-	if n == "Patricia" and s.day == 2 and s.phase == "commissions_two" and s.next_day_two_commission() == CampState.NETWORKS and s.media_count == 0:
-		return DayTwo.MEDIA_POINTS[0]
+	if n == "Patricia" and s.day == 2 and s.phase == "commissions_two" and s.next_day_two_commission() == CampState.NETWORKS:
+		return Networks.POINTS[0]
 	if s.phase in ["commissions", "expansion", "finished"]:
 		return clear_spot(ORGANIZATION + Vector2(-22 + ["Patricia", "Alejandro", "Marina"].find(n) * 22, -14), s)
 	var p := Vector2.ZERO
@@ -287,6 +288,9 @@ func draw(c: Control, s: CampState, rect: Rect2, t: float, walking: bool, arriva
 		{"pos":npc_pos("Marina", s, t), "tex":MARINA},
 		{"pos":s.player, "tex":PLAYER, "walking":walking}
 	])
+	if s.phase=="commissions_two" and s.next_day_two_commission()==CampState.NETWORKS and s.phone.data.network.get("started",false):
+		actors.append({"pos":Networks.POINTS[2]+Vector2(sin(t*1.5)*8,4),"tex":MARINA,"walking":true})
+		actors.append({"pos":KITCHEN+Vector2(-7+sin(t*1.8)*17,13),"tex":ALEJANDRO,"walking":true})
 	if s.tents > 0:
 		actors.append({"pos":SITE,"pitch":0})
 	if s.commissions >= 2:
@@ -363,7 +367,10 @@ func objective_locations(s: CampState, t: float) -> Array[Dictionary]:
 		"meeting_two": items.append({"label":"Segunda asamblea", "pos":MEETING, "kind":"goal"})
 		"commissions_two":
 			var index := s.next_day_two_commission()
-			if index >= 0:
+			if index==CampState.NETWORKS and s.phone.data.profile.get("configured",false) and s.phone.data.network.get("started",false):
+				var subject := Networks.next_subject(s.phone)
+				if subject>=0: items.append({"label":Networks.SUBJECT_NAMES[subject],"pos":Networks.POINTS[subject],"kind":"goal"})
+			elif index >= 0:
 				items.append({"label":DayTwo.NAMES[index], "pos":DayTwo.POINTS[index], "kind":"goal"})
 		"talk":
 			for name in ["Patricia", "Alejandro", "Marina"]:

@@ -39,6 +39,7 @@ var joystick_radius := 1.0
 var joystick_vector := Vector2.ZERO
 var elapsed := 0.0
 const CUE = preload("res://scripts/manus/procedural_sfx.gd")
+const Networks = preload("res://scripts/camp/activities_two/photo.gd")
 const PhoneStory = preload("res://scripts/camp/phone/story.gd")
 var phone_ui := preload("res://scripts/camp/phone/device.gd").new()
 var activity_sound := AudioStreamPlayer.new()
@@ -71,6 +72,7 @@ func _ready() -> void:
 		touch_layout = touch_layout or bool(JavaScriptBridge.eval("matchMedia('(any-pointer: coarse)').matches"))
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	activity_sounds = {
+		"error": CUE.tone(238, 0.18, 0.12, 104),
 		"asamblea": CUE.tone(430, 0.15, 0.12, 580),
 		"accesibilidad": CUE.tone(360, 0.09, 0.12, 520),
 		"redes": CUE.tone(1080, 0.07, 0.10, 410),
@@ -89,9 +91,9 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	var phone_available := can_open_phone()
-	if phone_available or phone_ui.shown:
+	if phone_safe_window() or phone_ui.shown:
 		PhoneStory.sync(s.phone,s.day,s.phase,s.commissions,s.day_two_completed)
-		if s.commissions>=1 and s.phone.data.contacts.has("Alejandro") and not s.phone.seen("call:org"):
+		if phone_available and s.commissions>=1 and s.phone.data.contacts.has("Alejandro") and not s.phone.seen("call:org"):
 			phone_ui.start_call("Alejandro",true)
 		s.phone.tick(delta,s.day,s.clock_hour())
 	phone_ui.step(delta,phone_available)
@@ -137,7 +139,7 @@ func _process(delta: float) -> void:
 		if day_two_open:
 			day_two_activity.tick(delta)
 			if day_two_activity.cue:
-				activity_sound.stream = activity_sounds[day_two_activity.mode]
+				activity_sound.stream = activity_sounds["error" if day_two_activity.session.fault_cue else day_two_activity.mode]
 				activity_sound.play()
 				day_two_activity.cue = false
 			if day_two_activity.done:
@@ -226,8 +228,6 @@ func advance_expansion() -> void:
 			announce("Siguiente comisión: " + DayTwo.NAMES[s.next_day_two_commission()] + ".")
 		elif s.tents >= World.DAY_TWO_TENTS:
 			s.delivery = "close"
-		elif s.has_day_two_commission(State.ACCESSIBILITY):
-			s.delivery = "delegated"
 		else:
 			s.delivery = "offer"
 		return
@@ -287,14 +287,32 @@ func interact_day_two() -> bool:
 	if s.phase != "commissions_two":
 		return false
 	var index := s.next_day_two_commission()
+	if index==State.NETWORKS:
+		if not s.phone.data.network.get("started",false):
+			if s.player.distance_to(DayTwo.POINTS[index])>42: return false
+			begin_network_assignment()
+			return true
+		if not s.phone.data.profile.get("configured",false):
+			announce("Abre Móvil → Instagram y configura la cuenta de Acampada València.")
+			return true
+		var subject := Networks.next_subject(s.phone)
+		if subject >= 0 and s.player.distance_to(Networks.POINTS[subject])<=29:
+			s.phone.data.network.prepared = subject
+			s.phone.changed = true
+			if subject==0: PhoneStory.talk(s.phone,"Patricia")
+			announce(Networks.BRIEFS[subject])
+			s.save_game()
+			return true
+		return false
 	if index < 0 or s.player.distance_to(DayTwo.POINTS[index]) > 42:
 		return false
-	if index == State.NETWORKS:
-		open_phone()
-		phone_ui.navigate("social")
-	else:
-		open_day_two_activity(DayTwo.KINDS[index])
+	open_day_two_activity(DayTwo.KINDS[index])
 	return true
+
+func begin_network_assignment() -> void:
+	Networks.start(s.phone)
+	s.save_game()
+	announce("Encargo de Redes. Abre el móvil junto al mapa y entra en Instagram.")
 
 func open_day_two_activity(kind: String) -> void:
 	commission_open = true
@@ -308,34 +326,32 @@ func complete_day_two_activity() -> void:
 		s.assembly_plan = str(day_two_activity.session.result.get("plan", ""))
 		s.phase = "commissions_two"
 		s.save_game()
-		announce("Acuerdo aprobado. Abre Accesibilidad para recibir a quienes lleguen.")
+		announce("Acuerdo aprobado. Ve al punto de Redes para comenzar.")
 		return
 	var index := s.next_day_two_commission()
-	if index < 0: return
-	if index == State.NETWORKS:
-		s.media_count = DayTwo.MEDIA.size()
-		s.posts = day_two_activity.published.duplicate(true)
-		s.phone.import_campaign(s.posts)
-		for post_index in range(s.posts.size()):
-			var key := "campaign:%d"%post_index
-			s.phone.comment(key,"Comunicación","Publicación incorporada al perfil de la acampada.")
-		if s.phone.data.contacts.has("Patricia") and not "Patricia" in s.phone.data.followers:
-			s.phone.data.followers.append("Patricia")
+	if index < 0 or index == State.NETWORKS: return
 	s.respect += day_two_activity.session.score / 10
 	if index == 2: s.wellbeing = clampi(s.wellbeing + (day_two_activity.session.score - 50) / 5, 0, 100)
+	finish_new_commission(index)
+
+func finish_new_commission(index: int, detail: String = "") -> void:
 	s.finish_day_two_commission(index)
 	advance_expansion()
 	s.save_game()
 	var messages := [
-		"Las tres publicaciones están en el perfil simulado. Ya puedes abrir el teléfono junto al mapa.",
-		"El equipo recibe avisos y mantiene libres las zonas de paso.",
-		"Ya hay un punto para hablar y resolver problemas internos.",
-		"El Punto sanitario queda abierto para atender a quien lo necesite.",
-		"Desde ahora, Accesibilidad monta las tiendas que llegan y acompaña a las personas hasta su parcela."
+		"Las tres publicaciones están en Instagram. El móvil queda disponible. ",
+		"El equipo recibe avisos y mantiene libres las zonas de paso. ",
+		"Ya hay un punto de encuentro para compartir material. ",
+		"El Punto sanitario queda abierto. ",
+		"El camino hasta las tiendas queda señalizado. "
 	]
-	open_dialog(DayTwo.NAMES[index].to_upper(), messages[index])
+	open_dialog(DayTwo.NAMES[index].to_upper(), messages[index] + detail + "Recibe a quienes llegan con las siguientes cinco tiendas.")
 
 func can_open_phone() -> bool:
+	var unlocked: bool = s.phone.data.unlocks.get("phone",false) or s.has_day_two_commission(State.NETWORKS)
+	return unlocked and phone_safe_window()
+
+func phone_safe_window() -> bool:
 	return screen == "play" and rest_time < 0 and s.phase != "wake" and not paused and not dialogue and not commission_open and not mini and not map_open
 
 func open_phone() -> void:
@@ -344,15 +360,32 @@ func open_phone() -> void:
 	s.phone.import_campaign(s.posts)
 	phone_ui.open()
 
-func network_assignment_available() -> bool:
-	return s.day == 2 and s.phase == "commissions_two" and s.next_day_two_commission() == State.NETWORKS and s.player.distance_to(DayTwo.POINTS[State.NETWORKS]) <= 42
+func network_assignment_active() -> bool:
+	return s.day==2 and s.phase=="commissions_two" and s.next_day_two_commission()==State.NETWORKS and s.phone.data.network.get("started",false)
 
-func launch_network_from_phone() -> void:
-	if not phone_ui.shown or not network_assignment_available(): return
+func capture_network_subject(frame: Rect2) -> Dictionary:
+	if not network_assignment_active() or not s.phone.data.profile.get("configured",false): return {}
+	var subject: int = s.phone.data.network.get("prepared",-1)
+	if subject<0 or subject!=Networks.next_subject(s.phone): return {}
+	var point: Vector2 = Networks.POINTS[subject]
+	if s.player.distance_to(point)>29: return {}
+	var margin: float = [9.0,16.0,22.0][subject]
+	if frame.size.x <= 2*margin or frame.size.y <= 2*margin or not frame.grow(-margin).has_point(point-Vector2(0,8)):
+		s.phone.data.network.misses = int(s.phone.data.network.misses)+1
+		return {}
+	var offset := frame.get_center().distance_to(point-Vector2(0,8))
+	return {"subject":subject,"quality":clampi(roundi(100-offset*0.76),55,100)}
+
+func network_publication() -> bool:
+	if not network_assignment_active() or Networks.published_subjects(s.phone).size()<3: return false
+	var score := Networks.publish_score(s.phone)
+	s.media_count = 3
+	s.respect += score/10
 	phone_ui.close()
 	phone_ui.progress = 0
 	phone_ui.hide()
-	open_day_two_activity("redes")
+	finish_new_commission(State.NETWORKS,"Tres temas publicados · %d/100. "%score)
+	return true
 
 func keep_clear_of_new_shelters() -> void:
 	if walkable(s.player):
@@ -589,6 +622,14 @@ func objective() -> String:
 	match s.phase:
 		"meeting_two": return "Ve al círculo central para la segunda asamblea."
 		"commissions_two":
+			if network_assignment_active():
+				if not s.phone.data.profile.get("configured",false): return "Configura el perfil en Instagram."
+				var subject := Networks.next_subject(s.phone)
+				if subject>=0:
+					if int(s.phone.data.network.prepared)==subject and s.player.distance_to(Networks.POINTS[subject])<=29:
+						return "Abre Cámara y encuadra " + Networks.SUBJECT_NAMES[subject] + "."
+					return "Ve a " + Networks.SUBJECT_NAMES[subject] + " y pulsa Acción."
+				return "Publica las tres escenas en Instagram."
 			return "Abre la comisión de " + DayTwo.NAMES[s.next_day_two_commission()]
 		"talk": return "Conoce a Patricia, Alejandro y Marina  ·  %d/3" % [int(s.talked.Patricia) + int(s.talked.Alejandro) + int(s.talked.Marina)]
 		"meeting": return "Ve al círculo central y participa en la primera asamblea."
@@ -1148,7 +1189,9 @@ func _input(event: InputEvent) -> void:
 			else: interact()
 			return
 	if event is InputEventScreenTouch:
-		if event.pressed and not event.canceled: pointer_down(event.position, event.index)
+		if event.canceled and commission_open and day_two_open:
+			day_two_activity.session.cancel(event.index)
+		elif event.pressed and not event.canceled: pointer_down(event.position, event.index)
 		else: pointer_up(event.position, event.index)
 	elif event is InputEventScreenDrag:
 		if commission_open and day_two_open and not paused:
@@ -1161,6 +1204,7 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion:
 		if commission_open and day_two_open and not paused:
 			day_two_activity.aim(event.relative / mini_scale, -1)
+			day_two_activity.hover((event.position-mini_rect.position)/mini_scale)
 		if joystick_pointer == -1: update_joystick(event.position)
 		elif dragging and mini and s.build_stage == 0: mini_piece = tarp_drag_point(event.position)
 
@@ -1265,6 +1309,7 @@ func load_checkpoint(index: int) -> void:
 	rest_time = -1
 	screen = "play"
 	if index == 13:
+		s.phone.unlock("phone")
 		s.day = 2
 		s.phase = "meeting_two"
 		for person in ["Patricia","Alejandro","Marina"]: PhoneStory.talk(s.phone,person)
@@ -1308,5 +1353,6 @@ func load_checkpoint(index: int) -> void:
 				s.tents += 5
 				s.capacity += 10
 			s.player = World.clear_spot(DayTwo.POINTS[target], s)
-			open_day_two_activity(DayTwo.KINDS[target])
+			if target==State.NETWORKS: begin_network_assignment()
+			else: open_day_two_activity(DayTwo.KINDS[target])
 	evening_shade = s.light_level()

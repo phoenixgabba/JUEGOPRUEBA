@@ -493,12 +493,19 @@ func capture_photo() -> void:
 	await RenderingServer.frame_post_draw
 	capturing = false
 	if not shown or at!="camera" or phone!=requested_phone: return
-	var key := phone.photo(viewfinder.get_texture().get_image())
+	var subject: Dictionary = game.capture_network_subject(camera_stage.plaza_frame())
+	var key := phone.photo(viewfinder.get_texture().get_image(),subject)
 	if key.is_empty():
 		label(content,"Galería llena. Elimina una foto sin compartir.",17,GOLD)
 		return
 	phone.data.settings.battery = maxi(65,int(phone.data.settings.get("battery",100))-1)
-	phone.notify("gallery",key,"Foto guardada","Captura de la plaza.")
+	if subject.has("subject"):
+		phone.data.network.prepared = -1
+		phone.notify("gallery",key,"Foto de Redes guardada",Photo.SUBJECT_NAMES[subject.subject])
+	else:
+		phone.notify("gallery",key,"Foto guardada","Captura de la plaza.")
+		if game.network_assignment_active() and int(phone.data.network.get("prepared",-1))>=0:
+			phone.notify("camera","","Motivo fuera del visor","Vuelve a encuadrar el acontecimiento para que la foto cuente.")
 	if phone.data.settings.sound: notify_sound.play()
 	game.s.save_game()
 	navigate("gallery",key)
@@ -581,9 +588,13 @@ func draw_gallery() -> void:
 			tile.custom_minimum_size.x = 130
 			line.add_child(tile)
 			image_widget(tile,photo.id,95)
-			button(tile,"Foto "+photo.id,func(): navigate("gallery",photo.id),44)
+			var name := "Foto "+str(photo.id)
+			if photo.has("subject"): name = Photo.SUBJECTS[photo.subject]
+			button(tile,name,func(): navigate("gallery",photo.id),44)
 		return
-	if not phone.data.photos.any(func(item): return item.id==key): return
+	var source: Array = phone.data.photos.filter(func(item): return item.id==key)
+	if source.is_empty(): return
+	if source[0].has("subject"): label(content,Photo.SUBJECT_NAMES[source[0].subject],19,GOLD)
 	image_widget(content,key,220 if alt_size().x>500 else 290)
 	var actions := row(content)
 	button(actions,"Ampliar",func(): navigate("attachment","photo:"+key))
@@ -610,12 +621,20 @@ func draw_share(kind: String, key: String) -> void:
 		button(content,"Añadir a historia",func(): navigate("social","story:"+key))
 
 func draw_social() -> void:
+	if target=="account":
+		draw_social_profile()
+		return
+	if game.network_assignment_active() and not phone.data.profile.get("configured",false):
+		label(content,"Crea la cuenta simulada de Acampada València para iniciar el encargo.")
+		button(content,"Crear perfil",func(): navigate("social","account"))
+		return
 	if target.begins_with("publish:") or target.begins_with("story:"):
 		var key := target.get_slice(":",1)
 		var is_story := target.begins_with("story:")
 		image_widget(content,key,195)
 		write(content,"","Pie de foto",func(value):
 			phone.publish(key,value,is_story)
+			if game.network_publication(): return
 			social_tab = "stories" if is_story else "profile"
 			navigate("social","",false),"Compartir")
 		return
@@ -628,17 +647,22 @@ func draw_social() -> void:
 				social_tab = key
 				navigate("social","",false),43)
 	if social_tab=="profile":
-		label(content,"@acampadavalencia",23,GOLD)
+		label(content,phone.data.profile.get("name","@acampadavalencia"),23,GOLD)
+		if phone.data.profile.get("configured",false):
+			draw_profile_avatar(content,phone.data.profile.get("avatar",""))
+			label(content,phone.data.profile.bio,17)
+			button(content,"Editar perfil",func(): navigate("social","account"),43)
 		label(content,"%d seguidores · %d publicaciones"% [phone.data.followers.size(),phone.data.social.size()+game.s.posts.size()],16)
 		for name in phone.data.followers: label(content,name,15)
 	if social_tab=="stories":
 		if phone.data.stories.is_empty(): label(content,"Ninguna historia publicada.")
 		for entry in phone.data.stories: social_card(entry,true)
 		return
-	if game.network_assignment_available():
-		button(content,"Abrir encargo de Redes",func(): game.launch_network_from_phone())
-	elif game.s.day==2 and not game.s.has_day_two_commission(0):
-		label(content,"Acércate al punto de Redes para empezar el encargo.",16)
+	if game.network_assignment_active():
+		label(content,"Encargo · %d/3 temas publicados"%Photo.published_subjects(phone).size(),18,GOLD)
+		var pending := Photo.next_subject(phone)
+		if pending>=0: label(content,"Vuelve a la plaza: "+Photo.SUBJECT_NAMES[pending]+".",17)
+		else: label(content,"Publica en el perfil las fotos de los tres temas desde Galería.",17)
 	button(content,"Elegir foto de la galería",func(): navigate("gallery"))
 	if target.begins_with("campaign:"):
 		var index := int(target.get_slice(":",1))
@@ -650,6 +674,63 @@ func draw_social() -> void:
 		if not target.is_empty() and target!=entry.id: continue
 		social_card(entry,false)
 	if phone.data.social.is_empty() and game.s.posts.is_empty(): label(content,"El perfil aún no tiene publicaciones.")
+
+func draw_profile_avatar(parent: Control, avatar: String) -> void:
+	if avatar=="camp-logo":
+		var mark := TextureRect.new()
+		mark.texture = game.World.TENT
+		mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		mark.custom_minimum_size.y = 74
+		parent.add_child(mark)
+	elif not avatar.is_empty(): image_widget(parent,avatar,95)
+
+func draw_social_profile() -> void:
+	var profile: Dictionary = phone.data.profile
+	var name_field := LineEdit.new()
+	name_field.text = profile.get("name","Acampada València")
+	name_field.placeholder_text = "Nombre del perfil"
+	name_field.max_length = 42
+	name_field.custom_minimum_size.y = 48
+	content.add_child(name_field)
+	var description := LineEdit.new()
+	description.text = profile.get("bio","")
+	description.placeholder_text = "Descripción de la acampada"
+	description.max_length = 150
+	description.custom_minimum_size.y = 48
+	content.add_child(description)
+	name_field.text_changed.connect(func(value):
+		profile.name = value
+		phone.changed = true)
+	description.text_changed.connect(func(value):
+		profile.bio = value
+		phone.changed = true)
+	draw_profile_avatar(content,profile.get("avatar",""))
+	button(content,"Usar emblema de la acampada",func():
+		profile.avatar = "camp-logo"
+		phone.changed = true
+		rebuild())
+	for photo in phone.data.photos:
+		button(content,"Usar foto "+str(photo.id)+" como imagen",func():
+			profile.avatar = photo.id
+			phone.changed = true
+			rebuild())
+	button(content,"Guardar perfil",func():
+		var name_text := name_field.text.strip_edges()
+		var bio := description.text.strip_edges()
+		if not save_profile(name_text,bio,str(profile.get("avatar",""))):
+			label(content,"Completa el nombre, la descripción y la imagen para continuar.",17,GOLD)
+			return
+		social_tab = "profile"
+		navigate("social","",false))
+
+func save_profile(name: String, bio: String, avatar: String) -> bool:
+	if name.is_empty() or bio.is_empty() or avatar.is_empty(): return false
+	if avatar!="camp-logo" and not phone.data.photos.any(func(photo): return photo.id==avatar): return false
+	phone.data.profile = {"name":name,"bio":bio,"avatar":avatar,"configured":true}
+	phone.changed = true
+	game.s.save_game()
+	return true
 
 func campaign_card(index: int, shot: Dictionary, detailed: bool) -> void:
 	var key := "campaign:%d"%index
