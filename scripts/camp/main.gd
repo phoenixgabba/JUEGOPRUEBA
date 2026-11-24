@@ -280,6 +280,16 @@ func start_day_two() -> void:
 	s.save_game()
 	announce("Vuelve al círculo central para la segunda asamblea.")
 
+func start_day_three() -> void:
+	if s.day != 2 or s.phase != "wake" or rest_time >= 0 or s.player.distance_to(World.tent_door(s)) > 16:
+		return
+	s.day = 3
+	s.phase = "explore_three"
+	s.delivery = ""
+	screen = "play"
+	s.save_game()
+	announce("Día 3. La plaza amanece con 50 tiendas y ocho comisiones.")
+
 func interact_day_two() -> bool:
 	if s.phase == "meeting_two" and s.player.distance_to(World.MEETING) < 75:
 		open_day_two_activity("asamblea")
@@ -466,7 +476,8 @@ func interact() -> void:
 		mini_action()
 		return
 	if s.phase == "wake":
-		start_day_two()
+		if s.day == 2: start_day_three()
+		else: start_day_two()
 		return
 	if s.phase == "return_tent" and s.player.distance_to(World.tent_door(s)) <= 16:
 		rest_time = 0
@@ -543,10 +554,10 @@ func interact_with_delivery() -> bool:
 			commission_open = true
 		"close":
 			if s.player.distance_to(World.ORGANIZATION) > 38: return false
-			s.phase = "return_tent" if s.day == 1 else "finished"
+			s.phase = "return_tent"
 			s.delivery = ""
-			var summary := "Terminamos el día con 25 tiendas nuevas y cinco comisiones más."
-			open_dialog("CIERRE DEL DÍA", summary if s.day == 2 else "La plaza queda abierta. Cuando quieras descansar, busca tu tienda con la marca azul y pulsa Acción o E en la entrada.", "show_end" if s.day == 2 else "")
+			var summary := "Terminamos el día con 25 tiendas nuevas y cinco comisiones más. " if s.day == 2 else ""
+			open_dialog("CIERRE DEL DÍA", summary + "Busca tu tienda con la marca azul y pulsa Acción o E en la entrada para descansar.")
 		_: return false
 	s.save_game()
 	return true
@@ -645,6 +656,7 @@ func objective() -> String:
 			}.get(s.delivery, "")
 			return "%s · %d/%d tiendas" % [instruction, s.tents, World.tent_goal(s)]
 		"finished": return "Día 2 cerrado · 50 tiendas y 8 comisiones" if s.day == 2 else "Día 1 cerrado"
+		"explore_three": return "Día 3 · Explora la plaza. Las nuevas misiones aún no están disponibles."
 		"return_tent": return "Vuelve a tu tienda para descansar."
 		"wake": return "Ha amanecido. Sal de tu tienda con Acción o E."
 	return "Explora la plaza."
