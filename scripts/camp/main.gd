@@ -46,6 +46,10 @@ var activity_sound := AudioStreamPlayer.new()
 var activity_sounds: Dictionary = {}
 var rest_time := -1.0
 var test_build := false
+var selector_page := 0
+const CHECKPOINT_LABELS := ["Cierre del Día 1", "Regreso a tu tienda", "Entrar y descansar", "Amanecer", "Segunda asamblea", "Redes", "Seguridad", "Convivencia", "Punto sanitario", "Accesibilidad", "Montaje de tienda", "Almacén", "Cocina", "Teléfono y aplicaciones", "Inicio · conocer a la gente", "Primera asamblea", "Recoger materiales", "Primera llegada de tiendas", "Asignar una parcela", "Organización", "Comunicación", "Cierre del Día 2", "Regreso a tu tienda · Día 2", "Entrar y descansar · Día 2", "Amanecer · Día 3", "Explorar Día 3", "Montar tienda donada", "Llegadas finales · Día 1"]
+const CHECKPOINT_PAGES := [[14,15,16,10,17,18,11,19],[12,26,20,27,0,1,2,3],[4,5,6,7,8,9,13],[21,22,23,24,25]]
+const CHECKPOINT_TABS := ["D1 · Inicio","D1 · Comisiones","D2 · Comisiones","D2 · Cierre"]
 var evening_shade := 0.0
 var save_timer := 0.0
 var walking := false
@@ -1268,7 +1272,9 @@ func pointer_down(pos: Vector2, index: int) -> void:
 				"mini_action": mini_action()
 				"mini_close": mini = false
 				_:
-					if id.begins_with("checkpoint:") and test_build:
+					if id.begins_with("checkpoint_page:") and test_build:
+						selector_page = clampi(int(id.get_slice(":",1)),0,CHECKPOINT_PAGES.size()-1)
+					elif id.begins_with("checkpoint:") and test_build:
 						load_checkpoint(int(id.get_slice(":", 1)))
 					elif id.begins_with("peg"):
 						mini_selected = int(id.substr(3))
@@ -1285,26 +1291,33 @@ func pointer_up(_pos: Vector2, index: int) -> void:
 
 
 func draw_selector() -> void:
-	draw_texture_rect(COVER, Rect2(Vector2.ZERO, size_v), false)
-	var labels := ["Cierre del Día 1", "Regreso a tu tienda", "Entrar y descansar", "Amanecer", "Segunda asamblea"] + DayTwo.NAMES + ["Montaje de tienda", "Almacén", "Cocina", "Teléfono y aplicaciones"]
+	draw_texture_rect(COVER, Rect2(Vector2.ZERO,size_v),false)
+	var ids: Array = CHECKPOINT_PAGES[selector_page]
 	var cols := 2 if size_v.x > size_v.y else 1
-	var layout := Vector2(430 * cols + 20, 78 + ceili(float(labels.size()) / cols) * 58)
-	mini_scale = minf((size_v.x - 20) / layout.x, (size_v.y - 20) / layout.y)
-	mini_rect = Rect2((size_v - layout * mini_scale) / 2, layout * mini_scale)
-	draw_set_transform(mini_rect.position, 0, Vector2.ONE * mini_scale)
+	var layout := Vector2(430*cols+20,146+ceili(float(ids.size())/cols)*58)
+	mini_scale = minf((size_v.x-20)/layout.x,(size_v.y-20)/layout.y)
+	mini_rect = Rect2((size_v-layout*mini_scale)/2,layout*mini_scale)
+	draw_set_transform(mini_rect.position,0,Vector2.ONE*mini_scale)
 	drawing_mini = true
-	panel(Rect2(Vector2.ZERO, layout))
-	text(Vector2(24, 44), "Saltar a un punto de prueba", 29, Color("fff5df"), true)
-	for i in range(labels.size()):
-		button(Rect2(20 + (i % cols) * 430, 64 + (i / cols) * 58, 410, 51), labels[i], "checkpoint:%d" % i, false, 22)
+	panel(Rect2(Vector2.ZERO,layout))
+	text(Vector2(24,40),"Saltar a un punto de prueba",29,Color("fff5df"),true)
+	var tab_width := (layout.x-40)/2
+	for i in range(CHECKPOINT_TABS.size()):
+		button(Rect2(20+(i%2)*tab_width,51+floori(float(i)/2)*43,tab_width-4,39),CHECKPOINT_TABS[i],"checkpoint_page:%d"%i,i==selector_page,17)
+	for i in range(ids.size()):
+		var id: int = ids[i]
+		button(Rect2(20+(i%cols)*430,142+floori(float(i)/cols)*58,410,51),CHECKPOINT_LABELS[id],"checkpoint:%d"%id,false,22)
 	drawing_mini = false
 	draw_set_transform(Vector2.ZERO)
 
 func load_checkpoint(index: int) -> void:
-	if not test_build or index < 0 or index > 13: return
+	if not test_build or index < 0 or index >= CHECKPOINT_LABELS.size(): return
 	s = State.new()
 	s.practice = true
 	phone_ui.reset(s.phone)
+	for person in s.talked: s.talked[person] = true
+	for material in s.collected: s.collected[material] = true
+	s.build_stage = 4
 	s.tents = 25
 	s.commissions = 3
 	s.material_boxes = 4
@@ -1320,7 +1333,84 @@ func load_checkpoint(index: int) -> void:
 	day_two_open = false
 	rest_time = -1
 	screen = "play"
-	if index == 13:
+	if index >= 14:
+		if index >= 21 and index <= 25:
+			s.day = 2
+			s.tents = 50
+			s.capacity = 98
+			s.people = 64
+			s.assembly_plan = "Cuidados"
+			for previous in State.DAY_TWO_ORDER: s.finish_day_two_commission(previous)
+			s.phone.unlock("phone")
+			s.phase = "return_tent"
+			if index == 21:
+				s.phase = "expansion"
+				s.delivery = "close"
+			elif index >= 23:
+				s.player = World.tent_door(s)
+				if index >= 24: s.phase = "wake"
+				if index == 25: start_day_three()
+		else:
+			s.tents = 0
+			s.capacity = 0
+			s.commissions = 0
+			s.material_boxes = 0
+			s.build_stage = 0
+			s.player = World.ENTRANCE
+			s.phase = "talk"
+			match index:
+				14:
+					for person in s.talked: s.talked[person] = false
+					for material in s.collected: s.collected[material] = false
+				15:
+					s.phase = "meeting"
+					s.player = World.MEETING
+					interact()
+				16:
+					s.phase = "materials"
+					for material in s.collected: s.collected[material] = false
+				17,18:
+					s.tents = 1
+					s.build_stage = 4
+					s.phase = "expansion"
+					s.delivery = "offer" if index == 17 else "assign"
+					s.player = World.ENTRANCE if index == 17 else World.next_pitch(s)
+				19:
+					s.tents = 6
+					s.capacity = 10
+					s.material_boxes = 4
+					s.build_stage = 4
+					s.phase = "commissions"
+					s.player = World.ORGANIZATION
+					interact()
+				20:
+					s.tents = World.COMMUNICATION_TENTS
+					s.capacity = (s.tents-1)*2
+					s.material_boxes = 4
+					s.commissions = 2
+					s.build_stage = 4
+					s.phase = "commissions"
+					s.player = World.COMMUNICATION
+					interact()
+				26:
+					s.tents = 15
+					s.capacity = 28
+					s.commissions = 2
+					s.material_boxes = 4
+					s.phase = "build"
+					s.delivery = "donation"
+					s.player = World.next_pitch(s)
+					interact()
+				27:
+					s.tents = World.COMMUNICATION_TENTS
+					s.capacity = (s.tents-1)*2
+					s.commissions = 3
+					s.material_boxes = 4
+					s.build_stage = 4
+					s.phase = "expansion"
+					s.delivery = "offer"
+					s.player = World.ENTRANCE
+	elif index == 13:
 		s.phone.unlock("phone")
 		s.day = 2
 		s.phase = "meeting_two"
@@ -1340,6 +1430,7 @@ func load_checkpoint(index: int) -> void:
 		s.material_boxes = 4 if index == 12 else 0
 		s.capacity = maxi(0, s.tents - 1) * 2
 		if index == 10:
+			s.build_stage = 0
 			s.phase = "build"
 			s.player = World.SITE
 			interact()
@@ -1357,6 +1448,7 @@ func load_checkpoint(index: int) -> void:
 		s.phase = "meeting_two" if index == 4 else "commissions_two"
 		if index == 4:
 			s.player = World.clear_spot(World.MEETING, s)
+			open_day_two_activity("asamblea")
 		else:
 			var target := index - 5
 			for previous in State.DAY_TWO_ORDER:
