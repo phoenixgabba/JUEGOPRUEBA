@@ -28,6 +28,7 @@ run() {
 run 'Godot Engine' --editor --import --quit
 run '[acampada-tests] PASS:' --script test/camp_test.gd
 run '[day-two] PASS:' --script test/day_two_test.gd
+run '[phone] PASS:' --script test/phone_test.gd
 if [[ "${1:-}" == --export ]]; then
   for pack in docs/index.pck docs/pruebas-*.pck; do
     run 'Godot Engine' --main-pack "$pack" --quit-after 10

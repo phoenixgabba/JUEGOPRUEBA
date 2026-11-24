@@ -43,3 +43,16 @@ Cada actividad empieza con un ensayo interactivo. Al final, revisa la puntuació
 | Punto sanitario | Identifica peticiones en recepción y dirige cada ficha a agua, mantas o enlace profesional. Dos voluntarios con especialidades diferentes cubren estaciones, cola y almacén. La puntuación considera atención, espera, reposición y abandonos. |
 
 Los turnos en tiempo real de Accesibilidad, Redes, Seguridad y Punto sanitario rondan los tres minutos de simulación, con margen para recuperar los objetivos pendientes. La asamblea y Convivencia avanzan al deliberar, sin un temporizador que impida leer o discutir una propuesta.
+
+## Teléfono permanente
+
+Pulsa **P** en ordenador o **Móvil** junto al mapa en dispositivos táctiles. Usa Atrás, Inicio y Cerrar para navegar. El punto **Teléfono y aplicaciones** se suma a los 13 puntos anteriores y abre un teléfono de prueba con contactos y ejemplos narrativos. La partida normal comienza con la agenda de contactos, los chats y la galería vacíos.
+
+- **Cámara y Galería.** Arrastra el visor, ajusta el zoom y dispara. Desliza el carrete lateralmente. Abre una captura para ampliarla, compartirla o eliminarla. Las fotos compartidas se conservan para que sus enlaces sigan funcionando.
+- **Contactos, Mensajes y Teléfono.** Habla con los personajes en la plaza para recibir sus números ficticios. Consulta hilos individuales y grupales, adjuntos, llamadas entrantes y el historial.
+- **Instagram.** Consulta el feed, el perfil, las historias, los comentarios y los mensajes directos. Abre el encargo original desde el punto de Redes de la plaza. Sus publicaciones quedan en el perfil y sus imágenes en la galería.
+- **Correo, Notas y Archivos.** Redacta correo con adjuntos y consulta las bandejas de entrada, enviados y borradores. Puedes escribir notas y compartir archivos recibidos.
+- **Mapa, Agenda, Reloj y Ajustes.** El mapa del móvil muestra las ubicaciones descubiertas y permite abrir el mapa habitual. El reloj interno gobierna alarmas y convocatorias. Los temporizadores miden segundos de exploración o de uso del móvil.
+- **Avisos.** Al pulsarlos, se abren sus aplicaciones y elementos. Durante una actividad, los avisos esperan a que vuelvas a la exploración.
+
+Las aplicaciones son simulaciones locales. El teléfono se guarda con la partida y el selector mantiene su propio estado de prueba.
