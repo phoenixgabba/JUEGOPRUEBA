@@ -5,7 +5,7 @@ const HOLE_BACK := preload("res://assets/visual/hole_back.png")
 const HOLE_FRONT := preload("res://assets/visual/hole_front.png")
 
 const SLOTS := [Vector2(76,172),Vector2(219,172),Vector2(362,172),Vector2(76,273),Vector2(219,273),Vector2(362,273),Vector2(76,373),Vector2(219,373),Vector2(362,373)]
-const LABELS := ["AVISO NEONAZI", "VECINA MAYOR", "MENOR", "VISITANTE"]
+const CHARACTERS := preload("res://assets/seguridad/personajes.svg")
 var slots: Dictionary = {}
 var correct := 0
 var mistakes := 0
@@ -18,11 +18,11 @@ var spawned := 0
 func initialize(seed_value: int, plan: String) -> void:
 	super.initialize(seed_value,plan)
 	title = "Seguridad · alerta en la plaza"
-	help = "Toca el aviso de práctica. En la partida, marca solo «Aviso neonazi»: identifica el aviso por su texto, nunca por el aspecto del personaje."
+	help = "Identifica al agitador neonazi por su distintivo 88. Toca para avisar a Seguridad. No marques a niños ni a personas mayores."
 	slots[4] = make_actor(0,20.0)
 
 func make_actor(role: int, span: float) -> Dictionary:
-	return {"role":role,"sprite":rng.randi_range(0,3),"born":clock,"until":clock+span}
+	return {"role":role,"sprite":role*2+rng.randi_range(0,1),"born":clock,"until":clock+span}
 
 func advance(_delta: float) -> void:
 	for slot in slots.keys():
@@ -45,7 +45,7 @@ func advance(_delta: float) -> void:
 	var additional := mini(free.size(),1+stage/2)
 	for i in range(additional):
 		var slot := free.pop_at(rng.randi_range(0,free.size()-1)) as int
-		slots[slot] = make_actor(rng.randi_range(1,3),rng.randf_range(0.85,1.85))
+		slots[slot] = make_actor(rng.randi_range(1,2),rng.randf_range(0.85,1.85))
 	spawned += 1
 
 func perform(value: String) -> void:
@@ -57,7 +57,7 @@ func perform(value: String) -> void:
 	if tutorial:
 		trained()
 		next_wave = clock+0.45
-		feedback("Marca 15 avisos. Los errores y avisos perdidos reducen la puntuación.", SLOTS[slot])
+		feedback("Identifica a 15 agitadores. Evita marcar a los civiles.", SLOTS[slot])
 		return
 	flash[slot] = {"until":clock+0.34,"good":role==0}
 	if role==0:
@@ -65,7 +65,7 @@ func perform(value: String) -> void:
 		feedback("Alerta enviada · %d/15"%correct,SLOTS[slot])
 	else:
 		mistakes += 1
-		feedback("Era " + LABELS[role].to_lower() + ". Selecciona solo el aviso explícito.",SLOTS[slot],true)
+		feedback("¡Cuidado! Era una persona civil.",SLOTS[slot],true)
 	score = clampi(100-mistakes*8-misses*3-maxi(0,roundi(active_time)-43),0,100)
 	if correct==15:
 		finish(score,"15 avisos correctos · %d errores · %d avisos perdidos · %.1f s."%[mistakes,misses,active_time])
@@ -92,13 +92,14 @@ func scene(game: Control) -> void:
 			continue
 		var entry: Dictionary = slots[i]
 		var reveal := clampf(minf(clock-entry.born,entry.until-clock)*7,0,1)
-		var stature := 0.8 if entry.role==2 else 1.0
-		actor(game,p+Vector2(0,12-20*reveal),entry.sprite,(0.58+0.30*reveal)*stature,true)
+		var frame: int = entry.sprite
+		var height := 81.0
+		var width := height*96.0/112.0
+		var bottom := p.y+23.0
+		var visible := maxf(1.0,112.0*reveal)
+		var drawn_height := height*visible/112.0
+		var source := Rect2(frame*96,0,96,visible)
+		var destination := Rect2(p.x-width/2,bottom-drawn_height,width,drawn_height)
+		game.draw_texture_rect_region(CHARACTERS,destination,source)
 		game.draw_texture_rect(HOLE_FRONT,hole,false)
-		if entry.role==1:
-			game.draw_line(p+Vector2(11,-24),p+Vector2(14,-10),Color("c5a46a"),2)
-		var tag := Rect2(p-Vector2(55,1),Vector2(110,22))
-		game.draw_rect(tag,Color("743848") if entry.role==0 else Color("405759"))
-		game.text(tag.position+Vector2(0,15),LABELS[entry.role],12,CREAM,true,tag.size.x,HORIZONTAL_ALIGNMENT_CENTER)
-		meter(game,p+Vector2(-44,24),88,(entry.until-clock)/1.6,RED if entry.role==0 else GREEN)
 		hit(game,bay,"spot:%d"%i)
