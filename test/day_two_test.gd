@@ -106,10 +106,22 @@ func run() -> void:
 	main.s.player = CampWorld.ORGANIZATION
 	assert(main.interact_with_delivery())
 	main.close_dialog()
-	assert(main.s.phase == "finished" and main.screen == "result")
+	assert(main.s.phase == "return_tent" and main.screen == "play")
+	assert(main.s.clock_hour() == 22)
+	main.s.player = CampWorld.tent_door(main.s)
+	main.interact()
+	assert(main.rest_time == 0)
+	main._process(1.3)
+	assert(main.s.phase == "wake" and main.s.day == 2 and main.s.clock_hour() == 9)
+	main._process(1.6)
+	main.interact()
+	assert(main.s.day == 3 and main.s.phase == "explore_three")
+	assert(main.s.tents == 50 and main.s.day_two_completed == 31)
+	var day_three_save := CampState.new()
+	assert(day_three_save.load_game() and day_three_save.day == 3 and day_three_save.tents == 50)
 	var normal_save := FileAccess.get_file_as_string(CampState.SAVE_PATH)
 	main.test_build = true
-	for checkpoint in range(14):
+	for checkpoint in range(main.CHECKPOINT_LABELS.size()):
 		main.load_checkpoint(checkpoint)
 		assert(main.s.practice)
 		main.s.save_game()
@@ -133,35 +145,18 @@ func run() -> void:
 
 func play_assembly(activity) -> void:
 	var game = activity.session
-	activity.action("vote")
-	assert(game.chapter == 0)
-	activity.action("delegate:0")
-	activity.action("delegate:1")
-	assert(not game.tutorial)
-	while not game.report:
-		var solved := false
-		for mask in range(1, 1 << game.options.size()):
-			game.selected.clear()
-			game.remaining = game.budget.duplicate()
-			var affordable := true
-			for j in range(game.options.size()):
-				if (mask & (1<<j)) == 0: continue
-				var option: int = game.options[j]
-				activity.action("card:%d"%option)
-				if not option in game.selected: affordable = false
-			if not affordable: continue
-			var coverage: Array = game.effects()
-			var votes := 0
-			for person in range(4):
-				if game.support(person,coverage): votes += 1
-			if votes >= 2 and coverage[game.needs[0]] > 0:
-				activity.action("vote")
-				assert(game.voting)
-				activity.tick(4)
-				solved = true
-				break
-		assert(solved, "No viable coalition in chapter %s" % game.chapter)
-		if not solved: return
+	assert(game.matches().is_empty())
+	var attempts := 0
+	while not game.report and attempts < 100:
+		var swap: Vector2i = game.find_move()
+		assert(swap.x >= 0 and swap.y >= 0)
+		activity.action("tile:%d"%swap.x)
+		activity.action("tile:%d"%swap.y)
+		for cascade in range(100):
+			if game.pending.is_empty() or game.report: break
+			activity.tick(0.5)
+		attempts += 1
+	assert(game.report and game.cleared >= game.GOAL)
 	assert(game.score > 0)
 
 func play_networks(main) -> void:
