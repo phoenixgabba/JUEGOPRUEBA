@@ -18,7 +18,7 @@ var spawned := 0
 func initialize(seed_value: int, plan: String) -> void:
 	super.initialize(seed_value,plan)
 	title = "Seguridad · alerta en la plaza"
-	help = "Identifica al agitador neonazi por su distintivo 88. Toca para avisar a Seguridad. No marques a niños ni a personas mayores."
+	help = "Identifica a los agitadores neonazis por la esvástica de su uniforme. Toca para avisar a Seguridad. No marques a niños ni a personas mayores."
 	slots[4] = make_actor(0,20.0)
 
 func make_actor(role: int, span: float) -> Dictionary:
@@ -93,9 +93,9 @@ func scene(game: Control) -> void:
 		var entry: Dictionary = slots[i]
 		var reveal := clampf(minf(clock-entry.born,entry.until-clock)*7,0,1)
 		var frame: int = entry.sprite
-		var height := 81.0
+		var height := 94.0 if entry.role == 0 else 81.0
 		var width := height*96.0/112.0
-		var bottom := p.y+23.0
+		var bottom := p.y+16.0 if entry.role == 0 else p.y+23.0
 		var visible := maxf(1.0,112.0*reveal)
 		var drawn_height := height*visible/112.0
 		var source := Rect2(frame*96,0,96,visible)
