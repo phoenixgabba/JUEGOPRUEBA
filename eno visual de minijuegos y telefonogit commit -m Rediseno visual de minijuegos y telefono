@@ -1,0 +1,116 @@
+ .gitignore                                 |   5 [32m+[m
+ assets/acampada/plaza_satelital.svg        | 365 [32m+++++++++++++++++++++++++++[m
+ assets/acampada/plaza_satelital.svg.import |  43 [32m++++[m
+ assets/art_v2/backpack.png                 | Bin [31m0[m -> [32m151733[m bytes
+ assets/art_v2/backpack.png.import          |  40 [32m+++[m
+ assets/art_v2/blanket.png                  | Bin [31m0[m -> [32m134764[m bytes
+ assets/art_v2/blanket.png.import           |  40 [32m+++[m
+ assets/art_v2/bone.png                     | Bin [31m0[m -> [32m70696[m bytes
+ assets/art_v2/bone.png.import              |  40 [32m+++[m
+ assets/art_v2/canteen.png                  | Bin [31m0[m -> [32m85366[m bytes
+ assets/art_v2/canteen.png.import           |  40 [32m+++[m
+ assets/art_v2/card_back.png                | Bin [31m0[m -> [32m15769[m bytes
+ assets/art_v2/card_back.png.import         |  40 [32m+++[m
+ assets/art_v2/card_face.png                | Bin [31m0[m -> [32m1316[m bytes
+ assets/art_v2/card_face.png.import         |  40 [32m+++[m
+ assets/art_v2/flashlight.png               | Bin [31m0[m -> [32m100478[m bytes
+ assets/art_v2/flashlight.png.import        |  40 [32m+++[m
+ assets/art_v2/gauze.png                    | Bin [31m0[m -> [32m118730[m bytes
+ assets/art_v2/gauze.png.import             |  40 [32m+++[m
+ assets/art_v2/megaphone.png                | Bin [31m0[m -> [32m121507[m bytes
+ assets/art_v2/megaphone.png.import         |  40 [32m+++[m
+ assets/art_v2/patient.png                  | Bin [31m0[m -> [32m123625[m bytes
+ assets/art_v2/patient.png.import           |  40 [32m+++[m
+ assets/art_v2/pegs.png                     | Bin [31m0[m -> [32m86560[m bytes
+ assets/art_v2/pegs.png.import              |  40 [32m+++[m
+ assets/art_v2/poles.png                    | Bin [31m0[m -> [32m123280[m bytes
+ assets/art_v2/poles.png.import             |  40 [32m+++[m
+ assets/art_v2/table.png                    | Bin [31m0[m -> [32m113859[m bytes
+ assets/art_v2/table.png.import             |  40 [32m+++[m
+ assets/art_v2/tarp.png                     | Bin [31m0[m -> [32m125264[m bytes
+ assets/art_v2/tarp.png.import              |  40 [32m+++[m
+ assets/art_v2/tent.png                     | Bin [31m0[m -> [32m122183[m bytes
+ assets/art_v2/tent.png.import              |  40 [32m+++[m
+ assets/art_v2/tray.png                     | Bin [31m0[m -> [32m95128[m bytes
+ assets/art_v2/tray.png.import              |  40 [32m+++[m
+ assets/art_v2/tweezers_closed.png          | Bin [31m0[m -> [32m33106[m bytes
+ assets/art_v2/tweezers_closed.png.import   |  40 [32m+++[m
+ assets/art_v2/tweezers_open.png            | Bin [31m0[m -> [32m52047[m bytes
+ assets/art_v2/tweezers_open.png.import     |  40 [32m+++[m
+ assets/visual/app_agenda.png               | Bin [31m0[m -> [32m7329[m bytes
+ assets/visual/app_agenda.png.import        |  40 [32m+++[m
+ assets/visual/app_calls.png                | Bin [31m0[m -> [32m6782[m bytes
+ assets/visual/app_calls.png.import         |  40 [32m+++[m
+ assets/visual/app_camera.png               | Bin [31m0[m -> [32m8592[m bytes
+ assets/visual/app_camera.png.import        |  40 [32m+++[m
+ assets/visual/app_clock.png                | Bin [31m0[m -> [32m9700[m bytes
+ assets/visual/app_clock.png.import         |  40 [32m+++[m
+ assets/visual/app_contacts.png             | Bin [31m0[m -> [32m6306[m bytes
+ assets/visual/app_contacts.png.import      |  40 [32m+++[m
+ assets/visual/app_files.png                | Bin [31m0[m -> [32m3241[m bytes
+ assets/visual/app_files.png.import         |  40 [32m+++[m
+ assets/visual/app_gallery.png              | Bin [31m0[m -> [32m9750[m bytes
+ assets/visual/app_gallery.png.import       |  40 [32m+++[m
+ assets/visual/app_mail.png                 | Bin [31m0[m -> [32m7559[m bytes
+ assets/visual/app_mail.png.import          |  40 [32m+++[m
+ assets/visual/app_map.png                  | Bin [31m0[m -> [32m13588[m bytes
+ assets/visual/app_map.png.import           |  40 [32m+++[m
+ assets/visual/app_messages.png             | Bin [31m0[m -> [32m5646[m bytes
+ assets/visual/app_messages.png.import      |  40 [32m+++[m
+ assets/visual/app_notes.png                | Bin [31m0[m -> [32m3041[m bytes
+ assets/visual/app_notes.png.import         |  40 [32m+++[m
+ assets/visual/app_notices.png              | Bin [31m0[m -> [32m5430[m bytes
+ assets/visual/app_notices.png.import       |  40 [32m+++[m
+ assets/visual/app_settings.png             | Bin [31m0[m -> [32m15241[m bytes
+ assets/visual/app_settings.png.import      |  40 [32m+++[m
+ assets/visual/app_social.png               | Bin [31m0[m -> [32m8628[m bytes
+ assets/visual/app_social.png.import        |  40 [32m+++[m
+ assets/visual/arcade_board.png             | Bin [31m0[m -> [32m66979[m bytes
+ assets/visual/arcade_board.png.import      |  40 [32m+++[m
+ assets/visual/assembly_mat.png             | Bin [31m0[m -> [32m39899[m bytes
+ assets/visual/assembly_mat.png.import      |  40 [32m+++[m
+ assets/visual/blocked.png                  | Bin [31m0[m -> [32m1067[m bytes
+ assets/visual/blocked.png.import           |  40 [32m+++[m
+ assets/visual/card_back.png                | Bin [31m0[m -> [32m29019[m bytes
+ assets/visual/card_back.png.import         |  40 [32m+++[m
+ assets/visual/card_front.png               | Bin [31m0[m -> [32m8488[m bytes
+ assets/visual/card_front.png.import        |  40 [32m+++[m
+ assets/visual/clinic_board.png             | Bin [31m0[m -> [32m77752[m bytes
+ assets/visual/clinic_board.png.import      |  40 [32m+++[m
+ assets/visual/clinic_tray.png              | Bin [31m0[m -> [32m8332[m bytes
+ assets/visual/clinic_tray.png.import       |  40 [32m+++[m
+ assets/visual/crate.png                    | Bin [31m0[m -> [32m4969[m bytes
+ assets/visual/crate.png.import             |  40 [32m+++[m
+ assets/visual/hole_back.png                | Bin [31m0[m -> [32m15252[m bytes
+ assets/visual/hole_back.png.import         |  40 [32m+++[m
+ assets/visual/hole_front.png               | Bin [31m0[m -> [32m9415[m bytes
+ assets/visual/hole_front.png.import        |  40 [32m+++[m
+ assets/visual/memory_item_5.png            | Bin [31m0[m -> [32m15354[m bytes
+ assets/visual/memory_item_5.png.import     |  40 [32m+++[m
+ assets/visual/memory_item_6.png            | Bin [31m0[m -> [32m9373[m bytes
+ assets/visual/memory_item_6.png.import     |  40 [32m+++[m
+ assets/visual/memory_item_7.png            | Bin [31m0[m -> [32m13734[m bytes
+ assets/visual/memory_item_7.png.import     |  40 [32m+++[m
+ assets/visual/memory_item_8.png            | Bin [31m0[m -> [32m15084[m bytes
+ assets/visual/memory_item_8.png.import     |  40 [32m+++[m
+ assets/visual/memory_item_9.png            | Bin [31m0[m -> [32m7985[m bytes
+ assets/visual/memory_item_9.png.import     |  40 [32m+++[m
+ assets/visual/paving.png                   | Bin [31m0[m -> [32m1108[m bytes
+ assets/visual/paving.png.import            |  40 [32m+++[m
+ assets/visual/phone_wallpaper.png          | Bin [31m0[m -> [32m195062[m bytes
+ assets/visual/phone_wallpaper.png.import   |  40 [32m+++[m
+ docs/index.html                            |   2 [32m+[m[31m-[m
+ docs/index.pck                             | Bin [31m17334020[m -> [32m19077864[m bytes
+ docs/prueba.html                           |  21 [32m+[m[31m-[m
+ docs/pruebas-4a636fbdc0.pck                | Bin [31m0[m -> [32m19077912[m bytes
+ docs/pruebas.html                          |  21 [32m+[m[31m-[m
+ scripts/camp/activities_two/access.gd      |  14 [32m+[m[31m-[m
+ scripts/camp/activities_two/assembly.gd    |   5 [32m+[m[31m-[m
+ scripts/camp/activities_two/clinic.gd      |  41 [32m+[m[31m---[m
+ scripts/camp/activities_two/dispatch.gd    |  17 [32m+[m[31m-[m
+ scripts/camp/activities_two/mediation.gd   |  38 [32m+[m[31m--[m
+ scripts/camp/activities_two/photo.gd       |   7 [32m+[m[31m-[m
+ scripts/camp/activities_two/session.gd     |   3 [32m+[m[31m-[m
+ scripts/camp/phone/device.gd               | 379 [32m++++++++++++++++++++++[m[31m-------[m
+ scripts/camp/phone/icon.gd                 |  77 [32m++[m[31m----[m
+ 115 files changed, 2761 insertions(+), 237 deletions(-)

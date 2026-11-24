@@ -1,0 +1,25 @@
+ACTUALIZACION VISUAL Y DE JUGABILIDAD - MINIJUEGOS
+
+Contenido incluido:
+- scripts/camp/activities_two/assembly.gd
+- scripts/camp/activities_two/dispatch.gd
+- scripts/camp/activities_two/mediation.gd
+- scripts/camp/activities_two/access.gd
+- scripts/camp/activities.gd
+
+Cambios principales:
+- Asamblea: sustituida por una version mas jugable de seleccion de delegadas + acuerdos.
+- Seguridad: ahora el objetivo son nazis, y los falsos positivos son ninos, ancianas y vecinos.
+- Convivencia: cartas con iconos mas claros y visibles.
+- Accesibilidad: el recorrido se descubre al avanzar para que no se vea toda la solucion.
+- Cocina: redisenada la pantalla del minijuego de reparto con una presentacion mas cuidada.
+
+Como aplicar:
+1. Cierra Godot.
+2. Haz una copia de seguridad de tu proyecto.
+3. Extrae este ZIP en la carpeta raiz del proyecto.
+4. Acepta sobrescribir los archivos.
+5. Abre Godot y exporta de nuevo.
+
+Nota importante:
+Este paquete contiene solo archivos fuente actualizados. No incluye exportaciones web ya compiladas.
