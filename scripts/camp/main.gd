@@ -48,7 +48,7 @@ var rest_time := -1.0
 var test_build := false
 var selector_day := -1
 var selector_offset := 0
-const CHECKPOINT_LABELS := ["Cierre del Día 1", "Regreso a tu tienda", "Entrar y descansar", "Amanecer", "Segunda asamblea", "Redes", "Seguridad", "Convivencia", "Punto sanitario", "Accesibilidad", "Montaje de tienda", "Almacén", "Cocina", "Teléfono y aplicaciones", "Inicio · conocer a la gente", "Primera asamblea", "Recoger materiales", "Primera llegada de tiendas", "Asignar una parcela", "Organización", "Comunicación", "Cierre del Día 2", "Regreso a tu tienda · Día 2", "Entrar y descansar · Día 2", "Amanecer · Día 3", "Explorar Día 3", "Montar tienda donada", "Llegadas finales · Día 1"]
+const CHECKPOINT_LABELS := ["Cierre del Día 1", "Regreso a tu tienda", "Entrar y descansar", "Amanecer · Día 2", "Segunda asamblea", "Redes", "Seguridad", "Convivencia", "Punto sanitario", "Accesibilidad", "Montaje de tienda", "Almacén", "Cocina", "Teléfono y aplicaciones", "Inicio · conocer a la gente", "Primera asamblea", "Recoger materiales", "Primera llegada de tiendas", "Asignar una parcela", "Organización", "Comunicación", "Cierre del Día 2", "Regreso a tu tienda · Día 2", "Entrar y descansar · Día 2", "Amanecer · Día 3", "Explorar Día 3", "Montar tienda donada", "Llegadas finales · Día 1"]
 const CHECKPOINT_DAYS := [[14,15,16,10,17,18,11,19,12,26,20,27,0,1,2],[3,4,5,13,6,7,8,9,21,22,23],[24,25]]
 const CHECKPOINT_DAY_NAMES := ["Día 1 · Primeras tiendas","Día 2 · Nuevas comisiones","Día 3 · Amanecer"]
 var evening_shade := 0.0
@@ -1341,6 +1341,11 @@ func load_checkpoint(index: int) -> void:
 	if not test_build or index < 0 or index >= CHECKPOINT_LABELS.size(): return
 	s = State.new()
 	s.practice = true
+	arrivals.clear()
+	reset_joystick()
+	dragging = false
+	walking = false
+	toast_time = 0
 	phone_ui.reset(s.phone)
 	for person in s.talked: s.talked[person] = true
 	for material in s.collected: s.collected[material] = true
