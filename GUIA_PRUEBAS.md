@@ -1,6 +1,6 @@
 # Acampada València · guía de pruebas
 
-GitHub Pages sirve `docs/`. Abre `index.html` para jugar una partida normal y `pruebas.html` para abrir el selector. En pruebas, cada punto carga una partida temporal. Puedes repetirlo desde **Pausa → Puntos de prueba**.
+GitHub Pages sirve `docs/`. Abre `index.html` para jugar una partida normal y `prueba.html` para abrir el selector. En pruebas, cada punto carga una partida temporal. Puedes repetirlo desde **Pausa → Puntos de prueba**.
 
 Para probar una rama antes de incorporarla a GitHub Pages, descarga el ZIP de la rama, extráelo y ejecuta este comando en el directorio del proyecto. En Windows puedes sustituir `python3` por `py`.
 
@@ -8,7 +8,7 @@ Para probar una rama antes de incorporarla a GitHub Pages, descarga el ZIP de la
 python3 -m http.server 8000 --bind 127.0.0.1 --directory docs
 ```
 
-Abre [la partida normal](http://localhost:8000/) o [el selector](http://localhost:8000/pruebas.html).
+Abre [la partida normal](http://localhost:8000/) o [el selector](http://localhost:8000/prueba.html).
 
 ## Controles
 

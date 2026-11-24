@@ -42,6 +42,8 @@ assert f'"index.wasm":{(stage / "index.wasm").stat().st_size}' in prod_shell
 for file in stage.glob("index.*"):
     shutil.copyfile(file, docs / file.name)
 shutil.copyfile(practice_pack, docs / name)
+shell = shell.rstrip() + "\n"
+(docs / "prueba.html").write_text(shell)
 (docs / "pruebas.html").write_text(shell)
 for old in docs.glob("pruebas-*.pck"):
     if old.name != name and re.fullmatch(r"pruebas-[a-f0-9]{10}\.pck", old.name):

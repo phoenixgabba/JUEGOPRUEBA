@@ -1165,7 +1165,7 @@ func draw_selector() -> void:
 	draw_set_transform(mini_rect.position, 0, Vector2.ONE * mini_scale)
 	drawing_mini = true
 	panel(Rect2(Vector2.ZERO, layout))
-	text(Vector2(24, 44), "Pruebas de Acampada", 29, Color("fff5df"), true)
+	text(Vector2(24, 44), "Saltar a un punto de prueba", 29, Color("fff5df"), true)
 	for i in range(labels.size()):
 		button(Rect2(20 + (i % cols) * 430, 64 + (i / cols) * 58, 410, 51), labels[i], "checkpoint:%d" % i, false, 22)
 	drawing_mini = false
