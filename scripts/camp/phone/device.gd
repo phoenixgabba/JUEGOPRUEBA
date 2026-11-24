@@ -584,7 +584,7 @@ func draw_gallery() -> void:
 			button(tile,"Foto "+photo.id,func(): navigate("gallery",photo.id),44)
 		return
 	if not phone.data.photos.any(func(item): return item.id==key): return
-	image_widget(content,key,290)
+	image_widget(content,key,220 if alt_size().x>500 else 290)
 	var actions := row(content)
 	button(actions,"Ampliar",func(): navigate("attachment","photo:"+key))
 	button(actions,"Compartir",func(): navigate("gallery","share:"+key))
