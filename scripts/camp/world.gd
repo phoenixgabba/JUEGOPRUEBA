@@ -39,11 +39,7 @@ const KITCHEN := Vector2(540, 402)
 const COMMISSION_POINTS := [ORGANIZATION, KITCHEN, COMMUNICATION]
 const COMMISSION_NAMES := ["Organización", "Cocina", "Comunicación"]
 const CROWD_TEXTURES := [PATRICIA, ALEJANDRO, MARINA, PLAYER]
-const VARIANT_BASES := [1,1,0,1,2,1,0,1,1,1,2,0,1,2,1,1,1]
-const SKIN_TINTS := [Color("f0c6a3"),Color("deb398"),Color("a97554"),Color("f5d2b4"),Color("e6b391"),Color("b98b68"),Color("f2c9ac"),Color("d5a17d"),Color("edc19d"),Color("c79471"),Color("f1c9ad"),Color("e4b28f"),Color("bf8b65"),Color("eac4a7"),Color("986a4c"),Color("e0ae8a"),Color("d2a17d")]
-const HAIR_TINTS := [Color("49352c"),Color("a8a39b"),Color("302529"),Color("8d5835"),Color("ac653c"),Color("272226"),Color("c2b9ad"),Color("6d4934"),Color("54392c"),Color("372a25"),Color("75513b"),Color("bd8950"),Color("282329"),Color("92735b"),Color("392d28"),Color("9a683c"),Color("514039")]
-const CLOTH_TINTS := [Color("b56b60"),Color("7e966d"),Color("b58a54"),Color("6688b2"),Color("ba79a0"),Color("6a9b90"),Color("ae8791"),Color("c0a75f"),Color("658e86"),Color("bf7557"),Color("8695bb"),Color("d2a66c"),Color("889e67"),Color("a58cc2"),Color("557a95"),Color("b98b62"),Color("8884aa")]
-var crowd_variants: Array[Texture2D] = []
+const CROWD_ART := preload("res://assets/acampada/crowd_people.svg")
 
 const CROWD_NAMES := ["Tomi","Vicent","Amina","Pau","Cleo","Julian","Rosa","Marc","Carles","Hugo","Anna","Irene","Óscar","Lulu","Dan","David","Àlex"]
 const CORE_NAMES := ["Patricia","Alejandro","Marina"]
@@ -435,43 +431,8 @@ func actor(c: Control, tex: Texture2D, pos: Vector2, t: float, walking: bool) ->
 	var bob := sin(t * 9.0 + pos.x) * 0.5 if walking else sin(t * 1.7 + pos.x) * 0.15
 	c.draw_texture_rect(tex, Rect2(pos + Vector2(-5, -16 + bob), Vector2(10, 17)), false)
 
-func recolor_variant(source: Texture2D,index: int,base: int) -> Texture2D:
-	var pixels := source.get_image()
-	if pixels.is_compressed(): pixels.decompress()
-	pixels.convert(Image.FORMAT_RGBA8)
-	var w := pixels.get_width()
-	var h := pixels.get_height()
-	for y in range(h):
-		for x in range(w):
-			var original := pixels.get_pixel(x,y)
-			if original.a <= 0.0: continue
-			var ny := float(y)/float(h)
-			var hue := original.h
-			var sat := original.s
-			var light := original.v
-			var target := Color.WHITE
-			var strength := 0.0
-			if light < 0.13: continue
-			var warm := hue < 0.15 or hue > 0.96
-			# Shirt palette first, before the overlapping warm skin palette.
-			var shirt := (base == 0 and hue > 0.09 and hue < 0.18 and sat > 0.37) or (base == 1 and hue > 0.39 and hue < 0.65 and sat > 0.19) or (base == 2 and hue > 0.65 and hue < 0.91 and sat > 0.16)
-			if ny > 0.36 and ny < 0.66 and shirt:
-				target = CLOTH_TINTS[index]
-				strength = 0.95
-			elif warm and sat > 0.28 and light > 0.47 and (ny < 0.43 or (ny > 0.48 and ny < 0.73)):
-				target = SKIN_TINTS[index]
-				strength = 0.85
-			elif ny < (0.36 if base == 1 else 0.49) and warm and sat > 0.12 and light < 0.54:
-				target = HAIR_TINTS[index]
-				strength = 0.90
-			if strength > 0.0:
-				var recolored := Color.from_hsv(target.h,lerpf(sat,target.s,strength),clampf(light*lerpf(1.0,target.v/0.85,strength*0.65),0,1),original.a)
-				pixels.set_pixel(x,y,recolored)
-	return ImageTexture.create_from_image(pixels)
-
 func draw_crowd_actor(c: Control,pos: Vector2,index: int,t: float,walking: bool) -> void:
-	if crowd_variants.is_empty():
-		for i in range(CROWD_NAMES.size()):
-			var base: int = VARIANT_BASES[i]
-			crowd_variants.append(recolor_variant(CROWD_TEXTURES[base],i,base))
-	actor(c,crowd_variants[posmod(index,crowd_variants.size())],pos,t,walking)
+	c.draw_circle(pos,4,Color(0.16,0.14,0.10,0.27))
+	var bob := sin(t * 9.0 + pos.x) * 0.5 if walking else sin(t * 1.7 + pos.x) * 0.15
+	var frame := posmod(index,CROWD_NAMES.size())
+	c.draw_texture_rect_region(CROWD_ART,Rect2(pos+Vector2(-5,-16+bob),Vector2(10,17)),Rect2(frame*64,0,64,112))
