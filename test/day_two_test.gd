@@ -143,6 +143,15 @@ func run() -> void:
 		main.s.save_game()
 		main.s.reset_save()
 		assert(FileAccess.get_file_as_string(CampState.SAVE_PATH) == normal_save)
+	# Returning from an open activity must release its input before the next checkpoint.
+	main.load_checkpoint(5)
+	main.paused = true
+	main.clickables = [{"rect": Rect2(0, 0, 100, 100), "id": "title"}]
+	main.pointer_down(Vector2(20, 20), -1)
+	assert(main.screen == "selector" and not main.commission_open)
+	main.clickables = [{"rect": Rect2(0, 0, 100, 100), "id": "checkpoint:6"}]
+	main.pointer_down(Vector2(20, 20), -1)
+	assert(main.commission_open and activity.mode == "seguridad")
 	main.activity_sound.stop()
 	main.queue_free()
 	await process_frame

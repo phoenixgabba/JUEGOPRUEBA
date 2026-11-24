@@ -1124,7 +1124,14 @@ func pointer_down(pos: Vector2, index: int) -> void:
 				"hud_toggle": hud_expanded = not hud_expanded; queue_redraw()
 				"pause": paused = true; s.save_game()
 				"unpause": paused = false
-				"title": paused = false; screen = "selector" if test_build else "title"; s.save_game()
+				"title":
+					paused = false
+					commission_open = false
+					day_two_open = false
+					mini = false
+					clickables.clear()
+					screen = "selector" if test_build else "title"
+					s.save_game()
 				"explore": screen = "play"
 				"dialog": close_dialog()
 				"choice0": choose_assembly(0)
