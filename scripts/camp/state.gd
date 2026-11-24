@@ -11,6 +11,7 @@ var day_two_commissions := 0
 var day_two_completed := 0
 var media_count := 0
 var posts: Array = []
+var assembly_plan := ""
 var phase := "talk"
 var talked := {"Patricia": false, "Alejandro": false, "Marina": false}
 var collected := {"lona": false, "varillas": false, "piquetas": false}
@@ -77,7 +78,7 @@ func save_game() -> void:
 	if practice: return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null: return
-	f.store_string(JSON.stringify({"version":4,"day_two_completed":day_two_completed,"day":day,"day_two_commissions":day_two_commissions,"media_count":media_count,"posts":posts,"phase":phase,"talked":talked,"collected":collected,"build_stage":build_stage,"respect":respect,"energy":energy,"health":health,"wellbeing":wellbeing,"cash":cash,"people":people,"capacity":capacity,"tents":tents,"pitch_swaps":pitch_swaps,"commissions":commissions,"delivery":delivery,"delivery_progress":delivery_progress,"material_boxes":material_boxes,"choice":choice,"x":player.x,"y":player.y,"minutes":minutes}))
+	f.store_string(JSON.stringify({"version":4,"day_two_completed":day_two_completed,"day":day,"day_two_commissions":day_two_commissions,"media_count":media_count,"posts":posts,"assembly_plan":assembly_plan,"phase":phase,"talked":talked,"collected":collected,"build_stage":build_stage,"respect":respect,"energy":energy,"health":health,"wellbeing":wellbeing,"cash":cash,"people":people,"capacity":capacity,"tents":tents,"pitch_swaps":pitch_swaps,"commissions":commissions,"delivery":delivery,"delivery_progress":delivery_progress,"material_boxes":material_boxes,"choice":choice,"x":player.x,"y":player.y,"minutes":minutes}))
 	f.close()
 
 func load_game() -> bool:
@@ -91,6 +92,7 @@ func load_game() -> bool:
 	# Earlier Day 2 saves opened Redes through Accesibilidad in index order.
 	day_two_completed = clampi(int(d.get("day_two_completed", (1 << day_two_commissions) - 1)), 0, 31)
 	media_count = clampi(int(d.get("media_count", 0)), 0, 3)
+	assembly_plan = str(d.get("assembly_plan", ""))
 	posts.clear()
 	var saved_posts: Variant = d.get("posts", [])
 	if saved_posts is Array:

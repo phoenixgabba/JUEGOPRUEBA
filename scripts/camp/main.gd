@@ -40,6 +40,7 @@ var joystick_vector := Vector2.ZERO
 var elapsed := 0.0
 const CUE = preload("res://scripts/manus/procedural_sfx.gd")
 var activity_sound := AudioStreamPlayer.new()
+var activity_sounds: Dictionary = {}
 var rest_time := -1.0
 var test_build := false
 var evening_shade := 0.0
@@ -67,7 +68,14 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		touch_layout = touch_layout or JavaScriptBridge.eval("matchMedia('(any-pointer: coarse)').matches") == true
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	activity_sound.stream = CUE.tone(420, 0.13, 0.12, 680)
+	activity_sounds = {
+		"asamblea": CUE.tone(430, 0.15, 0.12, 580),
+		"accesibilidad": CUE.tone(360, 0.09, 0.12, 520),
+		"redes": CUE.tone(1080, 0.07, 0.10, 410),
+		"seguridad": CUE.tone(690, 0.11, 0.11, 620),
+		"convivencia": CUE.tone(330, 0.20, 0.10, 445),
+		"sanitario": CUE.tone(570, 0.13, 0.11, 815),
+	}
 	add_child(activity_sound)
 	set_process(true)
 	set_process_input(true)
@@ -107,6 +115,7 @@ func _process(delta: float) -> void:
 		if day_two_open:
 			day_two_activity.tick(delta)
 			if day_two_activity.cue:
+				activity_sound.stream = activity_sounds[day_two_activity.mode]
 				activity_sound.play()
 				day_two_activity.cue = false
 			if day_two_activity.done:
@@ -264,12 +273,13 @@ func interact_day_two() -> bool:
 func open_day_two_activity(kind: String) -> void:
 	commission_open = true
 	day_two_open = true
-	day_two_activity.start(kind)
+	day_two_activity.start(kind, s.assembly_plan)
 
 func complete_day_two_activity() -> void:
 	commission_open = false
 	day_two_open = false
 	if day_two_activity.mode == "asamblea":
+		s.assembly_plan = str(day_two_activity.session.result.get("plan", ""))
 		s.phase = "commissions_two"
 		s.save_game()
 		announce("Acuerdo aprobado. Abre Accesibilidad para recibir a quienes lleguen.")
@@ -279,6 +289,8 @@ func complete_day_two_activity() -> void:
 	if index == State.NETWORKS:
 		s.media_count = DayTwo.MEDIA.size()
 		s.posts = day_two_activity.published.duplicate(true)
+	s.respect += day_two_activity.session.score / 10
+	if index == 2: s.wellbeing = clampi(s.wellbeing + (day_two_activity.session.score - 50) / 5, 0, 100)
 	s.finish_day_two_commission(index)
 	advance_expansion()
 	s.save_game()
