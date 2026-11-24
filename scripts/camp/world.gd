@@ -110,6 +110,12 @@ static func make_pitches() -> PackedVector2Array:
 static func pitch_count(s: CampState) -> int:
 	return maxi(0, s.tents - 1)
 
+static func personal_tent(s: CampState) -> Vector2:
+	return pitch_at(s, 0)
+
+static func tent_door(s: CampState) -> Vector2:
+	return clear_spot(personal_tent(s) + Vector2(0, 6), s)
+
 static func next_pitch(s: CampState) -> Vector2:
 	return pitch_at(s, s.tents - 1)
 
@@ -322,6 +328,8 @@ func draw(c: Control, s: CampState, rect: Rect2, t: float, walking: bool, arriva
 			continue
 		if a.has("pitch"):
 			draw_pitch(c, a.pos, a.pitch)
+			if s.tents >= 2 and a.pos == personal_tent(s):
+				c.draw_rect(Rect2(a.pos + Vector2(-4, -13), Vector2(8, 4)), Color("84d5de"))
 			continue
 		actor(c, a.tex, a.pos, t, bool(a.get("walking", s.phase not in ["talk", "meeting"])))
 	c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -335,6 +343,8 @@ func box(c: Control, pos: Vector2) -> void:
 
 func map_locations(s: CampState, t: float) -> Array[Dictionary]:
 	var locations: Array[Dictionary] = [{"label":"Tú", "pos":s.player, "kind":"player"}]
+	if s.tents >= 2 and s.phase not in ["return_tent", "wake"]:
+		locations.append({"label":"Tu tienda", "pos":personal_tent(s), "kind":"built"})
 	if s.tents > 0:
 		locations.append({"label":"Almacén", "pos":SITE, "kind":"built"})
 	for i in range(s.commissions):
@@ -348,14 +358,13 @@ func map_locations(s: CampState, t: float) -> Array[Dictionary]:
 func objective_locations(s: CampState, t: float) -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
 	match s.phase:
-		"finished":
-			if s.day == 1: items.append({"label":"Empezar Día 2", "pos":ORGANIZATION, "kind":"goal"})
+		"return_tent", "wake":
+			items.append({"label":"Tu tienda", "pos":personal_tent(s), "kind":"goal"})
 		"meeting_two": items.append({"label":"Segunda asamblea", "pos":MEETING, "kind":"goal"})
 		"commissions_two":
-			if s.next_day_two_commission() == CampState.NETWORKS and s.media_count < DayTwo.MEDIA_POINTS.size():
-				items.append({"label":DayTwo.MEDIA[s.media_count], "pos":DayTwo.MEDIA_POINTS[s.media_count], "kind":"goal"})
-			else:
-				items.append({"label":DayTwo.NAMES[s.next_day_two_commission()], "pos":DayTwo.POINTS[s.next_day_two_commission()], "kind":"goal"})
+			var index := s.next_day_two_commission()
+			if index >= 0:
+				items.append({"label":DayTwo.NAMES[index], "pos":DayTwo.POINTS[index], "kind":"goal"})
 		"talk":
 			for name in ["Patricia", "Alejandro", "Marina"]:
 				if not s.talked[name]:

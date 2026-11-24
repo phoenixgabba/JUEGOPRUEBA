@@ -38,6 +38,10 @@ var joystick_center := Vector2.ZERO
 var joystick_radius := 1.0
 var joystick_vector := Vector2.ZERO
 var elapsed := 0.0
+const CUE = preload("res://scripts/manus/procedural_sfx.gd")
+var activity_sound := AudioStreamPlayer.new()
+var rest_time := -1.0
+var test_build := false
 var evening_shade := 0.0
 var save_timer := 0.0
 var walking := false
@@ -57,10 +61,14 @@ var size_v := Vector2(1280, 720)
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	test_build = OS.has_feature("camp_practice")
+	if test_build: screen = "selector"
 	touch_layout = DisplayServer.is_touchscreen_available()
 	if OS.has_feature("web"):
 		touch_layout = touch_layout or JavaScriptBridge.eval("matchMedia('(any-pointer: coarse)').matches") == true
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	activity_sound.stream = CUE.tone(420, 0.13, 0.12, 680)
+	add_child(activity_sound)
 	set_process(true)
 	set_process_input(true)
 	queue_redraw()
@@ -71,6 +79,19 @@ func _process(delta: float) -> void:
 	if toast_time > 0: toast_time -= delta
 	if paused or dialogue or mini or map_open or commission_open or screen != "play":
 		reset_joystick()
+	if rest_time >= 0:
+		rest_time += delta
+		if rest_time >= 2.8:
+			rest_time = -1
+			announce("Ha amanecido. Pulsa Acción o E para salir.")
+		elif rest_time >= 1.2 and s.phase != "wake":
+			s.phase = "wake"
+			s.energy = 100
+			s.player = World.tent_door(s)
+			evening_shade = 0
+			s.save_game()
+		queue_redraw()
+		return
 	if screen != "play" or paused or map_open:
 		queue_redraw()
 		return
@@ -85,12 +106,15 @@ func _process(delta: float) -> void:
 	elif commission_open:
 		if day_two_open:
 			day_two_activity.tick(delta)
+			if day_two_activity.cue:
+				activity_sound.play()
+				day_two_activity.cue = false
 			if day_two_activity.done:
 				complete_day_two_activity()
 		else:
 			activity.tick(delta)
 			if activity.done: complete_activity()
-	elif not dialogue:
+	elif not dialogue and s.phase != "wake":
 		var dir := movement()
 		walking = dir.length() > 0.05
 		if walking:
@@ -217,7 +241,7 @@ func form_commission() -> void:
 	open_dialog(World.COMMISSION_NAMES[index].to_upper(), NOTES[index])
 
 func start_day_two() -> void:
-	if s.day != 1 or s.phase != "finished":
+	if s.day != 1 or s.phase != "wake" or rest_time >= 0 or s.player.distance_to(World.tent_door(s)) > 16:
 		return
 	s.day = 2
 	s.phase = "meeting_two"
@@ -227,29 +251,34 @@ func start_day_two() -> void:
 
 func interact_day_two() -> bool:
 	if s.phase == "meeting_two" and s.player.distance_to(World.MEETING) < 75:
-		s.phase = "commissions_two"
-		s.save_game()
-		open_dialog("SEGUNDA ASAMBLEA", "Hoy necesitamos Redes para compartir avisos, Seguridad para cuidar la plaza, Convivencia para conflictos internos, un Punto sanitario y Accesibilidad. Abrimos Accesibilidad primero para que pueda recibir y alojar a quienes lleguen.")
+		open_day_two_activity("asamblea")
 		return true
 	if s.phase != "commissions_two":
 		return false
 	var index := s.next_day_two_commission()
-	if index == 0 and s.media_count < DayTwo.MEDIA.size():
-		if s.player.distance_to(DayTwo.MEDIA_POINTS[s.media_count]) > 48: return false
-		var capture: String = DayTwo.MEDIA[s.media_count]
-		open_dialog("REDES · CÁMARA", "Encuadre listo: " + capture + ".", "capture_media")
-		return true
-	if s.player.distance_to(DayTwo.POINTS[index]) > 42:
+	if index < 0 or s.player.distance_to(DayTwo.POINTS[index]) > 42:
 		return false
+	open_day_two_activity(DayTwo.KINDS[index])
+	return true
+
+func open_day_two_activity(kind: String) -> void:
 	commission_open = true
 	day_two_open = true
-	day_two_activity.start(DayTwo.KINDS[index])
-	return true
+	day_two_activity.start(kind)
 
 func complete_day_two_activity() -> void:
 	commission_open = false
 	day_two_open = false
+	if day_two_activity.mode == "asamblea":
+		s.phase = "commissions_two"
+		s.save_game()
+		announce("Acuerdo aprobado. Abre Accesibilidad para recibir a quienes lleguen.")
+		return
 	var index := s.next_day_two_commission()
+	if index < 0: return
+	if index == State.NETWORKS:
+		s.media_count = DayTwo.MEDIA.size()
+		s.posts = day_two_activity.published.duplicate(true)
 	s.finish_day_two_commission(index)
 	advance_expansion()
 	s.save_game()
@@ -265,7 +294,9 @@ func complete_day_two_activity() -> void:
 func open_phone() -> void:
 	if not s.has_day_two_commission(State.NETWORKS) or dialogue:
 		return
-	open_dialog("TELÉFONO · REDES", "@acampadavalencia · Perfil simulado. Publicaciones: " + ", ".join(DayTwo.MEDIA) + ".")
+	commission_open = true
+	day_two_open = true
+	day_two_activity.open_profile(s.posts)
 
 func keep_clear_of_new_shelters() -> void:
 	if walkable(s.player):
@@ -279,8 +310,11 @@ func keep_clear_of_new_shelters() -> void:
 
 func start_game(resume: bool) -> void:
 	s = State.new()
+	s.practice = test_build
+	rest_time = -1
 	if resume and s.load_game():
-		if not walkable(s.player): s.player = World.ENTRANCE
+		if s.phase == "wake": s.player = World.tent_door(s)
+		elif not walkable(s.player): s.player = World.ENTRANCE
 		arrivals = []
 	else:
 		s.reset_save()
@@ -317,10 +351,6 @@ func close_dialog() -> void:
 	dialogue = false
 	dialogue_next = ""
 	if next == "show_end": screen = "result"
-	if next == "capture_media":
-		s.media_count += 1
-		s.save_game()
-		announce("Contenido guardado para publicar en Redes.")
 
 func choose_assembly(option: int) -> void:
 	if not choosing: return
@@ -337,7 +367,7 @@ func choose_assembly(option: int) -> void:
 	open_dialog("ASAMBLEA", "Acordamos quedarnos y acampar. La primera tienda será común y servirá para guardar material. Busquemos lona, varillas y piquetas.", "")
 
 func interact() -> void:
-	if screen != "play": return
+	if screen != "play" or rest_time >= 0: return
 	if paused or commission_open: return
 	if dialogue:
 		if not choosing: close_dialog()
@@ -345,8 +375,13 @@ func interact() -> void:
 	if mini:
 		mini_action()
 		return
-	if s.day == 1 and s.phase == "finished" and s.player.distance_to(World.ORGANIZATION) < 55:
+	if s.phase == "wake":
 		start_day_two()
+		return
+	if s.phase == "return_tent" and s.player.distance_to(World.tent_door(s)) <= 16:
+		rest_time = 0
+		reset_joystick()
+		walking = false
 		return
 	if s.day == 2 and interact_day_two(): return
 	if s.phase == "meeting" and s.player.distance_to(World.MEETING) < 100:
@@ -418,10 +453,10 @@ func interact_with_delivery() -> bool:
 			commission_open = true
 		"close":
 			if s.player.distance_to(World.ORGANIZATION) > 38: return false
-			s.phase = "finished"
+			s.phase = "return_tent" if s.day == 1 else "finished"
 			s.delivery = ""
-			var summary := "Terminamos el día con 25 tiendas nuevas y cinco comisiones más." if s.day == 2 else "Terminamos el día con 25 tiendas y tres comisiones. Mañana seguimos."
-			open_dialog("CIERRE DEL DÍA", summary, "show_end")
+			var summary := "Terminamos el día con 25 tiendas nuevas y cinco comisiones más."
+			open_dialog("CIERRE DEL DÍA", summary if s.day == 2 else "La plaza queda abierta. Cuando quieras descansar, busca tu tienda con la marca azul y pulsa Acción o E en la entrada.", "show_end" if s.day == 2 else "")
 		_: return false
 	s.save_game()
 	return true
@@ -496,8 +531,6 @@ func objective() -> String:
 	match s.phase:
 		"meeting_two": return "Ve al círculo central para la segunda asamblea."
 		"commissions_two":
-			if s.next_day_two_commission() == State.NETWORKS and s.media_count < DayTwo.MEDIA.size():
-				return "Redes · Captura: " + DayTwo.MEDIA[s.media_count]
 			return "Abre la comisión de " + DayTwo.NAMES[s.next_day_two_commission()]
 		"talk": return "Conoce a Patricia, Alejandro y Marina  ·  %d/3" % [int(s.talked.Patricia) + int(s.talked.Alejandro) + int(s.talked.Marina)]
 		"meeting": return "Ve al círculo central y participa en la primera asamblea."
@@ -512,7 +545,9 @@ func objective() -> String:
 				"unload":"Guarda el material en la primera tienda", "close":"Cierra el día en Organización", "delegated":"Accesibilidad está recibiendo y alojando a las personas",
 			}.get(s.delivery, "")
 			return "%s · %d/%d tiendas" % [instruction, s.tents, World.tent_goal(s)]
-		"finished": return "Día 2 cerrado · 50 tiendas y 8 comisiones" if s.day == 2 else "Día 1 cerrado · ve a Organización para continuar"
+		"finished": return "Día 2 cerrado · 50 tiendas y 8 comisiones" if s.day == 2 else "Día 1 cerrado"
+		"return_tent": return "Vuelve a tu tienda para descansar."
+		"wake": return "Ha amanecido. Sal de tu tienda con Acción o E."
 	return "Explora la plaza."
 
 func _draw() -> void:
@@ -521,12 +556,21 @@ func _draw() -> void:
 	mobile_layout = touch_layout or portrait
 	clickables.clear()
 	draw_rect(Rect2(Vector2.ZERO,size_v), Color("e5dcc3"), true)
+	if screen == "selector":
+		draw_selector()
+		return
 	if screen == "title":
 		draw_title()
 		return
 	world_rect = camera_world_rect()
 	world.draw(self, s, world_rect, elapsed, walking, arrivals)
 	draw_rect(world_rect, Color(0.12, 0.16, 0.34, evening_shade))
+	if rest_time >= 0:
+		var alpha := clampf(minf(rest_time / 0.7, (2.8 - rest_time) / 0.7), 0, 1)
+		draw_rect(Rect2(Vector2.ZERO, size_v), Color(0.03, 0.05, 0.09, alpha))
+		if alpha > 0.9:
+			text(Vector2(0, size_v.y * 0.5), "Dentro de tu tienda" if s.phase != "wake" else "Amanece en la plaza", mobile_text_size(), Color("fff5df"), true, size_v.x, HORIZONTAL_ALIGNMENT_CENTER)
+		return
 	if map_open:
 		draw_camp_map()
 		return
@@ -709,32 +753,39 @@ func toggle_map() -> void:
 
 func draw_camp_map() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size_v), Color(0.04,0.09,0.07,0.94))
-	var width := minf(size_v.x - 44, (size_v.y - 205) * 16.0 / 9.0)
-	var start := Vector2((size_v.x - width) / 2.0, 70)
+	var fs := mobile_text_size() if mobile_layout else 20
+	var points := world.map_locations(s, elapsed)
+	var columns := 2 if portrait else 3
+	var rows := ceili(float(points.size()) / columns)
+	var margin := fs * 0.65
+	var step := fs * 1.65
+	var top := fs * 3
+	var width := minf(size_v.x - margin * 2, (size_v.y - top - (rows + 1) * step) * 16.0 / 9.0)
+	var start := Vector2((size_v.x - width) / 2.0, top)
 	var scale := width / 1280.0
 	var map_rect := Rect2(start, Vector2(width,720 * scale))
-	text(start + Vector2(0,-22), "Mapa · %d/%d tiendas" % [s.tents, World.tent_goal(s)], 20)
-	button(Rect2(map_rect.end.x - 118,10,118,44), "Cerrar", "map")
+	text(Vector2(margin, fs * 1.65), "Mapa · %d/%d tiendas" % [s.tents, World.tent_goal(s)], fs)
+	button(Rect2(size_v.x - margin - fs * 5, margin, fs * 5, fs * 1.9), "Cerrar", "map", false, fs)
 	draw_texture_rect(World.PLAZA, map_rect, false)
 	for i in range(World.pitch_count(s)):
 		var point := start + World.pitch_at(s,i) * scale
-		draw_circle(point, 3.0, Color("b0db96"))
-	var points := world.map_locations(s, elapsed)
+		draw_circle(point, 3.0 * scale, Color("b0db96"))
 	var offset_counts := {}
+	var marker_font := maxi(13, roundi(fs * 0.52))
+	var radius := marker_font * 0.8
+	var legend_width := (size_v.x - 2 * margin) / columns
 	for i in range(points.size()):
 		var item := points[i]
 		var point: Vector2 = start + item.pos * scale
 		var count: int = offset_counts.get(point,0)
 		offset_counts[point] = count + 1
-		if count > 0: point.x += count * 22
+		if count > 0: point.x += count * radius * 2
 		var color := Color("f5c172") if item.kind == "goal" else (Color("a3d58b") if item.kind == "built" else Color("8bd5ed"))
-		draw_circle(point,11,Color("172723"))
-		draw_arc(point,11,0,TAU,26,color,2)
-		text(point + Vector2(-11,5),str(i+1),13,color,true,22,HORIZONTAL_ALIGNMENT_CENTER)
-		var columns := 2 if width < 680 else 3
-		var column_width := width / columns
-		var label_pos := map_rect.end - Vector2(width,0) + Vector2(i % columns * column_width, 27 + floori(float(i) / columns) * 25)
-		text(label_pos,"%d  %s" % [i+1,item.label],16,color,true,column_width)
+		draw_circle(point, radius, Color("172723"))
+		draw_arc(point, radius, 0, TAU, 26, color, 2)
+		text(point + Vector2(-radius, marker_font * 0.37), str(i+1), marker_font, color, true, radius * 2, HORIZONTAL_ALIGNMENT_CENTER)
+		var label_pos := Vector2(margin + (i % columns) * legend_width, map_rect.end.y + (i / columns + 1) * step)
+		text(label_pos, "%d  %s" % [i+1,item.label], roundi(fs * 0.85), color, true, legend_width - 8)
 
 func mobile_button_row() -> Rect2:
 	var fs := mobile_text_size()
@@ -812,9 +863,6 @@ func draw_toast() -> void:
 	text(Vector2((size_v.x-w)/2+12,y+(29 if not portrait else 43)), toast, 16 if not portrait else 24, Color("fff4d7"), true, w-24, HORIZONTAL_ALIGNMENT_CENTER)
 
 func draw_dialog() -> void:
-	if dialogue_next == "capture_media":
-		draw_capture()
-		return
 	if mobile_layout:
 		draw_mobile_dialog()
 		return
@@ -840,25 +888,6 @@ func draw_dialog() -> void:
 		text(Vector2(x+25,y+h-22), "E / ESPACIO  ·  CONTINUAR", 14 if not portrait else 29, Color("6b7d69"), true)
 		clickables.append({"rect":r,"id":"dialog"})
 
-func draw_capture() -> void:
-	var fs := mobile_text_size() if mobile_layout else 28
-	var margin := fs * 0.55
-	var width := minf(size_v.x - margin * 2, fs * 24.0)
-	var frame_h := minf(width * 0.52, size_v.y * 0.38)
-	var x := (size_v.x - width) * 0.5
-	var frame := Rect2(x, margin + fs * 2, width, frame_h)
-	panel(Rect2(x, margin, width, frame_h + fs * 3.5), Color("203d35"))
-	text(Vector2(x + margin, margin + fs * 1.35), "Cámara · " + DayTwo.MEDIA[s.media_count], fs)
-	var subject: Vector2 = DayTwo.MEDIA_POINTS[s.media_count]
-	var sample := Rect2(subject - Vector2(95,62), Vector2(190,100))
-	var texture_size := Vector2(World.PLAZA.get_size()) / Vector2(1280,720)
-	draw_texture_rect_region(World.PLAZA, frame, Rect2(sample.position * texture_size, sample.size * texture_size))
-	if s.media_count == 0:
-		var sprite_size := frame.size.y * 0.35
-		draw_texture_rect(World.PATRICIA, Rect2(frame.get_center() - Vector2.ONE * sprite_size * 0.5, Vector2.ONE * sprite_size), false)
-	var row := mobile_button_row() if mobile_layout else Rect2(x,size_v.y-86,width,64)
-	button(row, "Guardar vídeo" if s.media_count == 1 else "Tomar foto", "dialog", true, fs)
-
 func draw_mobile_dialog() -> void:
 	var fs := mobile_text_size()
 	var margin := fs * 0.55
@@ -883,13 +912,20 @@ func draw_mobile_dialog() -> void:
 
 func draw_pause() -> void:
 	draw_rect(Rect2(Vector2.ZERO,size_v), Color(0.04,0.10,0.08,0.75), true)
-	var r := Rect2(size_v.x/2-260, size_v.y/2-195, 520, 390)
-	panel(r)
-	text(r.position+Vector2(30,54), "EN PAUSA", 34, Color("f1c578"), true)
-	paragraph(r.position+Vector2(30,94), "Tu progreso se guarda automáticamente en este dispositivo.", 455, 20)
-	button(Rect2(r.position+Vector2(30,140),Vector2(460,52)), "CONTINUAR", "unpause", true)
-	button(Rect2(r.position+Vector2(30,208),Vector2(460,52)), "VOLVER AL INICIO", "title")
-	button(Rect2(r.position+Vector2(30,276),Vector2(460,52)), "LICENCIAS", "licenses")
+	var layout := Vector2(470, 386)
+	mini_scale = minf((size_v.x - 32) / layout.x, (size_v.y - 32) / layout.y)
+	if not mobile_layout: mini_scale = minf(1.0, mini_scale)
+	mini_rect = Rect2((size_v - layout * mini_scale) * 0.5, layout * mini_scale)
+	draw_set_transform(mini_rect.position, 0, Vector2.ONE * mini_scale)
+	drawing_mini = true
+	panel(Rect2(Vector2.ZERO, layout))
+	text(Vector2(26,54), "EN PAUSA", 32, Color("f1c578"), true)
+	paragraph(Vector2(26,95), "El progreso de prueba se pierde al volver al selector." if test_build else "Tu progreso se guarda automáticamente en este dispositivo.", 418, 22)
+	button(Rect2(26,140,418,62), "CONTINUAR", "unpause", true)
+	button(Rect2(26,215,418,62), "PUNTOS DE PRUEBA" if test_build else "VOLVER AL INICIO", "title")
+	button(Rect2(26,290,418,62), "LICENCIAS", "licenses")
+	drawing_mini = false
+	draw_set_transform(Vector2.ZERO)
 
 func draw_result() -> void:
 	draw_rect(Rect2(Vector2.ZERO,size_v), Color(0.04,0.11,0.08,0.78), true)
@@ -899,7 +935,7 @@ func draw_result() -> void:
 	text(r.position+Vector2(36,102), "Día %d completado" % s.day, 38, Color("263e32"), true)
 	paragraph(r.position+Vector2(36,153), "La plaza tiene 50 tiendas y ocho comisiones. Accesibilidad se encarga de recibir y alojar a las personas." if s.day == 2 else "Hay 25 tiendas, incluida la de material común. Organización y Comunicación tienen puntos de reunión y Cocina ya cuenta con una mesa y cajas de comida.", 635, 21, Color("314a3c"))
 	text(r.position+Vector2(36,264), "RESPETO %d    ·    PERSONAS %d    ·    ALOJAMIENTO %d" % [s.respect,s.people,s.capacity], 18, Color("63745b"), true)
-	button(Rect2(r.position+Vector2(36,302),Vector2(638,55)), "EMPEZAR EL DÍA 2" if s.day == 1 else "SEGUIR EXPLORANDO", "day_two" if s.day == 1 else "explore", true)
+	button(Rect2(r.position+Vector2(36,302),Vector2(638,55)), "SEGUIR EXPLORANDO", "explore", true)
 	button(Rect2(r.position+Vector2(36,375),Vector2(638,45)), "VOLVER AL INICIO", "title")
 
 func draw_minigame() -> void:
@@ -1011,10 +1047,12 @@ func tarp_drag_point(pos: Vector2) -> Vector2:
 	return point
 
 func _input(event: InputEvent) -> void:
+	if rest_time >= 0: return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if commission_open:
+		if commission_open and not paused:
 			if event.keycode == KEY_ESCAPE:
-				commission_open = false
+				if test_build: paused = true
+				else: commission_open = false
 			else:
 				if day_two_open: day_two_activity.key(event.keycode)
 				else: activity.key(event.keycode)
@@ -1026,7 +1064,9 @@ func _input(event: InputEvent) -> void:
 			if event.keycode == KEY_ESCAPE: toggle_map()
 			return
 		if event.keycode == KEY_ESCAPE:
-			if mini: mini = false
+			if paused: paused = false
+			elif test_build and screen == "play" and not dialogue: paused = true
+			elif mini: mini = false
 			elif dialogue: pass
 			elif screen == "play": paused = not paused
 			return
@@ -1038,35 +1078,38 @@ func _input(event: InputEvent) -> void:
 		if event.keycode in [KEY_E,KEY_SPACE,KEY_ENTER,KEY_KP_ENTER]:
 			if screen == "title" and not confirm_new: start_game(FileAccess.file_exists(State.SAVE_PATH))
 			elif screen == "result":
-				if s.day == 1: start_day_two()
-				else: screen = "play"
+				screen = "play"
 			else: interact()
 			return
 	if event is InputEventScreenTouch:
 		if event.pressed and not event.canceled: pointer_down(event.position, event.index)
 		else: pointer_up(event.position, event.index)
 	elif event is InputEventScreenDrag:
-		if commission_open and day_two_open: day_two_activity.pointer((event.position - mini_rect.position) / mini_scale, event.index, "move")
+		if commission_open and day_two_open and not paused:
+			day_two_activity.aim(event.relative / mini_scale, event.index)
 		if event.index == joystick_pointer: update_joystick(event.position)
 		elif dragging and mini and s.build_stage == 0: mini_piece = tarp_drag_point(event.position)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed: pointer_down(event.position, -1)
 		else: pointer_up(event.position, -1)
 	elif event is InputEventMouseMotion:
-		if commission_open and day_two_open: day_two_activity.pointer((event.position - mini_rect.position) / mini_scale, -1, "move")
+		if commission_open and day_two_open and not paused:
+			day_two_activity.aim(event.relative / mini_scale, -1)
 		if joystick_pointer == -1: update_joystick(event.position)
 		elif dragging and mini and s.build_stage == 0: mini_piece = tarp_drag_point(event.position)
 
 func pointer_down(pos: Vector2, index: int) -> void:
-	if commission_open and day_two_open: day_two_activity.pointer((pos - mini_rect.position) / mini_scale, index, "down")
-	if mini and s.build_stage == 0 and pos.distance_to(mini_rect.position + tarp_panel_point(mini_piece) * mini_scale) < 75*mini_scale:
+	if commission_open and day_two_open and not paused and mini_scale > 0:
+		if day_two_activity.begin_aim((pos - mini_rect.position) / mini_scale, index): return
+	if mini and not paused and s.build_stage == 0 and pos.distance_to(mini_rect.position + tarp_panel_point(mini_piece) * mini_scale) < 75*mini_scale:
 		dragging = true
 		return
 	for entry in clickables:
 		if entry.rect.has_point(pos):
 			var id: String = entry.id
-			if commission_open:
+			if commission_open and not paused:
 				if id == "commission_close": commission_open = false
+				elif id == "pause": paused = true
 				elif id.begins_with("activity:"):
 					if day_two_open: day_two_activity.action(id.trim_prefix("activity:"))
 					else: activity.action(id.trim_prefix("activity:"))
@@ -1081,7 +1124,7 @@ func pointer_down(pos: Vector2, index: int) -> void:
 				"hud_toggle": hud_expanded = not hud_expanded; queue_redraw()
 				"pause": paused = true; s.save_game()
 				"unpause": paused = false
-				"title": paused = false; screen = "title"; s.save_game()
+				"title": paused = false; screen = "selector" if test_build else "title"; s.save_game()
 				"explore": screen = "play"
 				"dialog": close_dialog()
 				"choice0": choose_assembly(0)
@@ -1093,19 +1136,96 @@ func pointer_down(pos: Vector2, index: int) -> void:
 				"action": interact()
 				"map": toggle_map()
 				"phone": open_phone()
-				"day_two": start_day_two()
 				"mini_action": mini_action()
 				"mini_close": mini = false
 				_:
-					if id.begins_with("peg"):
+					if id.begins_with("checkpoint:") and test_build:
+						load_checkpoint(int(id.get_slice(":", 1)))
+					elif id.begins_with("peg"):
 						mini_selected = int(id.substr(3))
 						mini_action()
 			return
 
-func pointer_up(pos: Vector2, index: int) -> void:
-	if commission_open and day_two_open: day_two_activity.pointer((pos - mini_rect.position) / mini_scale, index, "up")
+func pointer_up(_pos: Vector2, index: int) -> void:
+	if commission_open and day_two_open: day_two_activity.release_aim(index)
 	if index == joystick_pointer:
 		reset_joystick()
 	if dragging:
 		dragging = false
 		if mini and s.build_stage == 0 and mini_piece.distance_to(Vector2(560,235)) < 65: complete_build_stage()
+
+
+func draw_selector() -> void:
+	draw_texture_rect(COVER, Rect2(Vector2.ZERO, size_v), false)
+	var labels := ["Cierre del Día 1", "Regreso a tu tienda", "Entrar y descansar", "Amanecer", "Segunda asamblea"] + DayTwo.NAMES + ["Montaje de tienda", "Almacén", "Cocina"]
+	var cols := 2 if size_v.x > size_v.y else 1
+	var layout := Vector2(430 * cols + 20, 78 + ceili(float(labels.size()) / cols) * 58)
+	mini_scale = minf((size_v.x - 20) / layout.x, (size_v.y - 20) / layout.y)
+	mini_rect = Rect2((size_v - layout * mini_scale) / 2, layout * mini_scale)
+	draw_set_transform(mini_rect.position, 0, Vector2.ONE * mini_scale)
+	drawing_mini = true
+	panel(Rect2(Vector2.ZERO, layout))
+	text(Vector2(24, 44), "Pruebas de Acampada", 29, Color("fff5df"), true)
+	for i in range(labels.size()):
+		button(Rect2(20 + (i % cols) * 430, 64 + (i / cols) * 58, 410, 51), labels[i], "checkpoint:%d" % i, false, 22)
+	drawing_mini = false
+	draw_set_transform(Vector2.ZERO)
+
+func load_checkpoint(index: int) -> void:
+	if not test_build or index < 0 or index > 12: return
+	s = State.new()
+	s.practice = true
+	s.tents = 25
+	s.commissions = 3
+	s.material_boxes = 4
+	s.capacity = 48
+	s.phase = "return_tent"
+	s.player = World.clear_spot(World.ORGANIZATION, s)
+	paused = false
+	map_open = false
+	mini = false
+	dialogue = false
+	choosing = false
+	commission_open = false
+	day_two_open = false
+	rest_time = -1
+	screen = "play"
+	if index == 0:
+		s.phase = "expansion"
+		s.delivery = "close"
+	elif index == 2 or index == 3:
+		s.player = World.tent_door(s)
+		if index == 3: s.phase = "wake"
+	elif index >= 10:
+		s.tents = [0, 6, 12][index - 10]
+		s.commissions = 1 if index == 12 else 0
+		s.material_boxes = 4 if index == 12 else 0
+		s.capacity = maxi(0, s.tents - 1) * 2
+		if index == 10:
+			s.phase = "build"
+			s.player = World.SITE
+			interact()
+		elif index == 11:
+			s.phase = "expansion"
+			s.delivery = "unload"
+			s.player = World.clear_spot(World.SITE, s)
+			interact()
+		else:
+			s.phase = "commissions"
+			s.player = World.KITCHEN
+			interact()
+	elif index >= 4:
+		s.day = 2
+		s.phase = "meeting_two" if index == 4 else "commissions_two"
+		if index == 4:
+			s.player = World.clear_spot(World.MEETING, s)
+		else:
+			var target := index - 5
+			for previous in State.DAY_TWO_ORDER:
+				if previous == target: break
+				s.finish_day_two_commission(previous)
+				s.tents += 5
+				s.capacity += 10
+			s.player = World.clear_spot(DayTwo.POINTS[target], s)
+			open_day_two_activity(DayTwo.KINDS[target])
+	evening_shade = s.light_level()

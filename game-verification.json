@@ -6,6 +6,12 @@
       "path": "res://test/camp_test.gd",
       "expect": "[acampada-tests] PASS:",
       "profile": "source"
+    },
+    {
+      "kind": "script",
+      "path": "res://test/day_two_test.gd",
+      "expect": "[day-two] PASS:",
+      "profile": "source"
     }
   ]
 }
