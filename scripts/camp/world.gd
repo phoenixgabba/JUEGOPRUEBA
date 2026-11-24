@@ -39,6 +39,9 @@ const KITCHEN := Vector2(540, 402)
 const COMMISSION_POINTS := [ORGANIZATION, KITCHEN, COMMUNICATION]
 const COMMISSION_NAMES := ["Organización", "Cocina", "Comunicación"]
 const CROWD_TEXTURES := [PATRICIA, ALEJANDRO, MARINA, PLAYER]
+const CROWD_ART := preload("res://assets/acampada/crowd_people.svg")
+const CROWD_NAMES := ["Núria","Vicent","Amina","Pau","Laia","Samir","Rosa","Marc","Irene","Hugo","Fátima","Júlia","Óscar","Carmen","Dani","Berta","Àlex"]
+const CORE_NAMES := ["Patricia","Alejandro","Marina"]
 const MAX_TENTS := 800
 const TENT_GROUND := Vector2(9, 5)
 const TENT_SIZE := Vector2(23, 21)
@@ -243,6 +246,30 @@ func npc_pos(n: String, s: CampState, t: float) -> Vector2:
 		p += Vector2(sin(t * 0.42 + shift) * 18.0, cos(t * 0.35 + shift) * 7.0)
 	return clear_spot(p,s)
 
+func crowd_carrier(i: int,s: CampState) -> bool:
+	return s.phase == "expansion" and s.delivery in ["leaving","returning","offer","assign","placing"] and s.tents <= 5 and i == s.tents-1
+
+func crowd_npc_pos(i: int,s: CampState,t: float) -> Vector2:
+	var base := crowd_position(i,s)
+	var offset := Vector2(sin(t*0.38+i*1.7)*9.0,cos(t*0.31+i*2.1)*5.0)
+	return clear_spot(base+offset,s)
+
+func nearest_npc(s: CampState,t: float) -> String:
+	var name := ""
+	var best := 88.0
+	for n in CORE_NAMES:
+		var distance := s.player.distance_to(npc_pos(n,s,t))
+		if distance < best:
+			best = distance
+			name = n
+	for i in range(CROWD_NAMES.size()):
+		if crowd_carrier(i,s): continue
+		var distance := s.player.distance_to(crowd_npc_pos(i,s,t))
+		if distance < minf(best,30.0):
+			best = distance
+			name = CROWD_NAMES[i]
+	return name
+
 func crowd_position(i: int, s: CampState) -> Vector2:
 	var center := MEETING if s.phase == "meeting" else Vector2(440 + (i % 5) * 67, 390 + floori(i / 5.0) * 36)
 	var pos := center + Vector2.from_angle(i * TAU / 17.0) * (32.0 + float(i % 3) * 9.0)
@@ -300,23 +327,22 @@ func draw(c: Control, s: CampState, rect: Rect2, t: float, walking: bool, arriva
 	for i in range(mini(s.material_boxes, 4)):
 		actors.append({"pos":SITE + Vector2(8 + i * 7, 0), "box":true})
 	var carriers := s.phase == "expansion" and s.delivery in ["leaving", "returning", "offer", "assign", "placing"]
-	for i in range(17):
-		if carriers and s.tents <= 5 and i == s.tents - 1:
-			continue
-		actors.append({"pos":crowd_position(i,s), "tex":CROWD_TEXTURES[i % 4], "name":""})
+	for i in range(CROWD_NAMES.size()):
+		if crowd_carrier(i,s): continue
+		actors.append({"pos":crowd_npc_pos(i,s,t),"crowd":i,"name":CROWD_NAMES[i]})
 	if carriers:
 		var pos := ENTRANCE
 		match s.delivery:
 			"leaving": pos = delivery_point(s, crowd_position(s.tents - 1, s), ENTRANCE)
 			"returning": pos = delivery_point(s, ENTRY_APPROACH, ENTRANCE)
 			"placing": pos = delivery_point(s, ENTRANCE, next_pitch(s))
-		actors.append({"pos":pos, "tex":CROWD_TEXTURES[(s.tents - 1) % 4], "walking":s.delivery in ["leaving", "returning", "placing"]})
+		actors.append({"pos":pos, "crowd":posmod(s.tents - 1,CROWD_NAMES.size()), "walking":s.delivery in ["leaving", "returning", "placing"]})
 	if s.day == 2 and s.delivery == "delegated":
 		var guest := delivery_point(s, ENTRY_APPROACH, next_pitch(s))
-		actors.append({"pos":guest, "tex":CROWD_TEXTURES[s.tents % 4], "walking":true})
+		actors.append({"pos":guest, "crowd":posmod(s.tents,CROWD_NAMES.size()), "walking":true})
 		actors.append({"pos":clear_spot(guest + Vector2(-12, 4), s), "tex":MARINA, "walking":true})
 	for i in range(arrival_positions.size()):
-		actors.append({"pos":arrival_positions[i], "tex":CROWD_TEXTURES[i % 4]})
+		actors.append({"pos":arrival_positions[i], "crowd":posmod(s.tents+i,CROWD_NAMES.size())})
 	for i in range(pitch_count(s)):
 		actors.append({"pos": pitch_at(s, i), "pitch": i})
 	actors.sort_custom(func(a, b): return a.pos.y < b.pos.y)
@@ -335,7 +361,10 @@ func draw(c: Control, s: CampState, rect: Rect2, t: float, walking: bool, arriva
 			if s.tents >= 2 and a.pos == personal_tent(s):
 				c.draw_rect(Rect2(a.pos + Vector2(-4, -13), Vector2(8, 4)), Color("84d5de"))
 			continue
-		actor(c, a.tex, a.pos, t, bool(a.get("walking", s.phase not in ["talk", "meeting"])))
+		if a.has("crowd"):
+			draw_crowd_actor(c,a.pos,int(a.crowd),t,bool(a.get("walking",true)))
+		else:
+			actor(c, a.tex, a.pos, t, bool(a.get("walking", s.phase not in ["talk", "meeting"])))
 	c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 static func camp_build_point(s: CampState) -> Vector2:
@@ -400,3 +429,9 @@ func actor(c: Control, tex: Texture2D, pos: Vector2, t: float, walking: bool) ->
 	c.draw_circle(pos, 4, Color(0.16, 0.14, 0.10, 0.27))
 	var bob := sin(t * 9.0 + pos.x) * 0.5 if walking else sin(t * 1.7 + pos.x) * 0.15
 	c.draw_texture_rect(tex, Rect2(pos + Vector2(-5, -16 + bob), Vector2(10, 17)), false)
+
+func draw_crowd_actor(c: Control,pos: Vector2,index: int,t: float,walking: bool) -> void:
+	c.draw_circle(pos,4,Color(0.16,0.14,0.10,0.27))
+	var bob := sin(t*8.0+index)*0.55 if walking else 0.0
+	var r := Rect2(pos+Vector2(-6,-19+bob),Vector2(12,20))
+	c.draw_texture_rect_region(CROWD_ART,r,Rect2(index*20,0,20,32))
