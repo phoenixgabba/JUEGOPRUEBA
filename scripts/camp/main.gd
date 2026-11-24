@@ -589,7 +589,7 @@ func talk_to(n: String) -> void:
 
 func crowd_dialogue(n: String) -> String:
 	var dialogues := {
-		"Tomi": ["He venido a escuchar. ¿Dónde será la asamblea?","Estoy anotando los acuerdos para que nadie se quede sin información.","Podemos revisar el acta de ayer y repartir las tareas de hoy."],
+		"Tomi": ["Soy Tomi, uso elle. He venido a escuchar y recoger los acuerdos de la asamblea.","Estoy anotando los acuerdos para que nadie se quede sin información.","Podemos revisar el acta de ayer y repartir las tareas de hoy."],
 		"Vicent": ["Traigo una silla plegable. No aguanto mucho tiempo de pie.","Me alegra que estén despejando los pasos entre tiendas.","Hoy buscaré un lugar tranquilo donde sentarme."],
 		"Amina": ["Puedo ayudar a traducir los avisos si hace falta.","Estoy pendiente de que las instrucciones se entiendan bien.","Podríamos preparar carteles en varios idiomas."],
 		"Pau": ["Tengo herramientas en casa. Puedo traerlas.","Si faltan varillas, preguntad en el almacén.","Voy a revisar el material antes de los relevos."],
@@ -602,10 +602,10 @@ func crowd_dialogue(n: String) -> String:
 		"Anna": ["Hay personas que aún no saben dónde reunirse.","Estoy ayudando a explicar cómo funcionan las comisiones.","Podemos mejorar la información para las nuevas llegadas."],
 		"Irene": ["He venido con mi madre y quiero conocer la plaza.","Me gusta ver cómo aparecen las tiendas.","Hoy quiero ayudar a dibujar señales."],
 		"Óscar": ["Puedo colaborar con los turnos de limpieza.","Estoy recogiendo lo que queda en los pasillos.","Voy a revisar los puntos de recogida."],
-		"Lulu": ["Necesito descansar de vez en cuando, pero puedo ayudar desde un banco.","Un banco libre y un paso ancho hacen mucha diferencia.","Hoy procuraré que haya sitio para sentarse."],
-		"Dan": ["Tengo algo de experiencia haciendo carteles.","Estoy preparando materiales para Comunicación.","Podemos actualizar los avisos de la plaza."],
+		"Lulu": ["Soy Lulu, persona no binaria. Puedo ayudar desde un banco cuando necesito descansar.","Un banco libre y un paso ancho hacen mucha diferencia.","Hoy procuraré que haya sitio para sentarse."],
+		"Dan": ["Soy Dan, uso elle. Tengo experiencia haciendo carteles y puedo ayudar en Comunicación.","Estoy preparando materiales para Comunicación.","Podemos actualizar los avisos de la plaza."],
 		"David": ["¿Hay algún espacio para compartir libros?","Estoy buscando un rincón para actividades tranquilas.","Me gustaría organizar una lectura compartida."],
-		"Àlex": ["Quiero saber cómo podemos repartir las tareas.","Estoy buscando un relevo para quienes llevan horas trabajando.","Hoy intentaré que nadie tenga que hacer dos turnos seguidos."]
+		"Àlex": ["Soy Àlex, persona no binaria. Quiero ayudar a repartir las tareas.","Estoy buscando un relevo para quienes llevan horas trabajando.","Hoy intentaré que nadie tenga que hacer dos turnos seguidos."]
 	}
 	var variants: Array = dialogues[n]
 	var chapter := 0 if s.day == 1 and s.phase in ["talk","meeting","materials"] else (2 if s.day >= 3 else 1)
