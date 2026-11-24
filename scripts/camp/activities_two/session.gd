@@ -105,9 +105,11 @@ func draw(game: Control) -> void:
 	game.draw_set_transform(origin, 0, Vector2.ONE * scale)
 	game.drawing_mini = true
 	game.panel(Rect2(Vector2.ZERO, layout), INK, Color("b79b67"))
-	game.text(Vector2(18, 35), title, 25, GOLD, true)
+	var title_width: float = game.BOLD.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 25).x
+	var title_size := mini(25, floori(25 * (layout.x - 88) / maxf(1, title_width)))
+	game.text(Vector2(18, 35), title, title_size, GOLD, true)
 	game.button(Rect2(layout.x - 64, 9, 54, 49), "Ⅱ" if game.test_build else "×", "pause" if game.test_build else "commission_close", false, 22)
-	game.text(Vector2(18, 65), status(), 16, GREEN, true, 405)
+	game.text(Vector2(18, 75), status(), 16, GREEN, true, 405)
 	scene(game)
 	for burst in bursts:
 		var age: float = clock - burst.time
