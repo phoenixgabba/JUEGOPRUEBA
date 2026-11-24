@@ -1,0 +1,92 @@
+name: Compilar y publicar Acampada Valencia
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Godot
+        run: |
+          BASE="https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable"
+          wget -q "$BASE/Godot_v4.7.2-stable_linux.x86_64.zip"
+          unzip -q Godot_v4.7.2-stable_linux.x86_64.zip
+          chmod +x Godot_v4.7.2-stable_linux.x86_64
+          sudo mv Godot_v4.7.2-stable_linux.x86_64 /usr/local/bin/godot
+
+      - name: Instalar plantillas de exportacion
+        run: |
+          BASE="https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable"
+          wget -q "$BASE/Godot_v4.7.2-stable_export_templates.tpz" -O /tmp/templates.zip
+          unzip -q /tmp/templates.zip -d /tmp/godot-templates
+          mkdir -p ~/.local/share/godot/export_templates
+          mv /tmp/godot-templates/templates ~/.local/share/godot/export_templates/4.7.2.stable
+
+      - name: Importar proyecto
+        run: |
+          set -o pipefail
+          godot --headless --editor --import --quit 2>&1 | tee /tmp/import.log
+          if grep -E 'SCRIPT ERROR|Parse Error|ERROR:' /tmp/import.log; then
+            exit 1
+          fi
+
+      - name: Compilar videojuego
+        run: |
+          set -o pipefail
+          mkdir -p dist/pruebas
+          godot --headless --export-release "Web" dist/index.html 2>&1 | tee /tmp/web.log
+          godot --headless --export-release "Web Pruebas" dist/pruebas/index.html 2>&1 | tee /tmp/pruebas.log
+          if grep -E 'SCRIPT ERROR|Parse Error|ERROR:' /tmp/web.log /tmp/pruebas.log; then
+            exit 1
+          fi
+          test -s dist/index.pck
+          test -s dist/pruebas/index.pck
+
+      - name: Preparar enlaces de pruebas
+        run: |
+          printf '%s\n' '<!doctype html><html><head><meta http-equiv="refresh" content="0; url=pruebas/index.html"></head><body><a href="pruebas/index.html">Abrir pruebas</a></body></html>' > dist/prueba.html
+          cp dist/prueba.html dist/pruebas.html
+          touch dist/.nojekyll
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir videojuego
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Publicar videojuego
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+
+      # Runs a set of commands using the runners shell
+      - name: Run a multi-line script
+        run: |
+          echo Add other actions to build,
+          echo test, and deploy your project.
