@@ -128,7 +128,7 @@ static func pitch_at(s: CampState, index: int) -> Vector2:
 	return Vector2(590 + (new_slot % 5) * 30, 306 + floori(new_slot / 5.0) * 19)
 
 static func tent_goal(s: CampState) -> int:
-	return DAY_TWO_TENTS if s.day == 2 else DAY_ONE_TENTS
+	return DAY_TWO_TENTS if s.day >= 2 else DAY_ONE_TENTS
 
 static func assign_pitch(s: CampState) -> bool:
 	var first := s.tents - 1
