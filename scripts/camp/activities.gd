@@ -2,6 +2,8 @@ extends RefCounted
 
 const SCORE_GOAL := 1000
 const FOOD_GOAL := 20
+const KITCHEN_ART := preload("res://assets/cocina/stand.svg")
+const FOOD_ART := preload("res://assets/cocina/food.svg")
 const TITLE := "ENS QUEDEM A ACAMPAR"
 const SHAPES := [
 	[Vector2i(0,0),Vector2i(1,0),Vector2i(0,1),Vector2i(1,1)],
@@ -27,6 +29,8 @@ var falling: Array[Dictionary] = []
 var player_lane := 2
 var food := 0
 var strikes := 0
+var kitchen_feedback := 0.0
+var kitchen_good := true
 const AGENDA_TOPICS := ["Acords", "Torns", "Materials", "Propostes"]
 const AGENDA_ROUNDS := 3
 const AGENDA_BEAT := 0.85
@@ -55,6 +59,8 @@ func start(activity: String) -> void:
 	player_lane = 2
 	food = 0
 	strikes = 0
+	kitchen_feedback = 0.0
+	kitchen_good = true
 	if mode == "storage":
 		spawn_piece()
 	elif mode == "organization":
@@ -119,6 +125,7 @@ func tick(delta: float) -> void:
 				clock -= .65
 				drop()
 		"catch":
+			kitchen_feedback = maxf(0.0,kitchen_feedback-delta)
 			if clock >= .58:
 				clock -= .58
 				falling.append({"lane":randi_range(0,4),"y":0.0,"food":turn % 4 != 2,"icon":turn % 4})
@@ -128,7 +135,9 @@ func tick(delta: float) -> void:
 				if falling[i].y < 1.0:
 					continue
 				if falling[i].lane == player_lane:
-					if falling[i].food: food += 1
+					kitchen_good = falling[i].food
+					kitchen_feedback = 0.42
+					if kitchen_good: food += 1
 					else: strikes += 1
 				falling.remove_at(i)
 			done = food >= FOOD_GOAL
@@ -339,37 +348,47 @@ func draw_puzzle(game: Control, vertical: bool) -> void:
 		game.clickables.append({"rect":game.mini_hit(r),"id":"activity:" + str(i)})
 
 func draw_catch(game: Control, vertical: bool) -> void:
-	game.text(Vector2(30,47), "Cocina · Alimentos %d/%d" % [food,FOOD_GOAL], 28)
-	game.paragraph(Vector2(30,88 if vertical else 81), "Recoge comida y esquiva herramientas. Golpes: %d/3" % strikes, 360 if vertical else 700, 22 if vertical else 18)
-	var lane_width := 77 if vertical else 137
-	var lane_x := 18 if vertical else 40
-	var lane_y := 156 if vertical else 104
-	var lane_h := 460 if vertical else 313
-	var lane_center := lane_x + (lane_width - 8) * 0.5
+	var field := Rect2(18,146,384,460) if vertical else Rect2(25,100,710,340)
+	game.text(Vector2(24,39),"Cocina · Despensa solidaria",23 if vertical else 29)
+	game.text(Vector2(24,72),"%02d / %02d alimentos" % [food,FOOD_GOAL],19,Color("f7d58f"),true)
+	var meter_x := 24.0 if vertical else 260.0
+	var meter_y := 86.0 if vertical else 61.0
+	var meter_w := 220.0 if vertical else 250.0
+	game.draw_rect(Rect2(meter_x,meter_y,meter_w,10),Color("142c29"))
+	game.draw_rect(Rect2(meter_x,meter_y,meter_w*clampf(float(food)/FOOD_GOAL,0,1),10),Color("a7d594"))
+	game.text(Vector2(24,125) if vertical else Vector2(24,92),"Recoge alimentos, evita la llave.",16)
+	for i in range(3):
+		var hp := Vector2(282+i*35,91) if vertical else Vector2(570+i*43,68)
+		game.draw_circle(hp,11,Color("ef9a69") if i < 3-strikes else Color("4c5650"))
+		game.draw_circle(hp,11,Color("f4dbb0"),false,2)
+	game.draw_texture_rect(KITCHEN_ART,field,false)
+	var stride := field.size.x/5.0
+	var icon_size := 51.0 if vertical else 57.0
+	var catch_y := field.end.y-42.0
+	for entry in falling:
+		var px := field.position.x+(float(entry.lane)+0.5)*stride
+		var py := lerpf(field.position.y+70.0,catch_y-17.0,clampf(float(entry.y),0,1))
+		var p := Vector2(px,py)
+		var rect := Rect2(p-Vector2.ONE*icon_size/2,Vector2.ONE*icon_size)
+		game.draw_texture_rect_region(FOOD_ART,rect,Rect2(int(entry.icon)*64,0,64,64))
+	var basket_x := field.position.x+(float(player_lane)+0.5)*stride
+	var basket := Vector2(basket_x,catch_y)
+	var basket_size := minf(stride-6.0,86.0)
+	game.draw_circle(basket+Vector2(0,28),basket_size*0.35,Color(0,0,0,0.22))
+	var bounce := sin(kitchen_feedback/0.42*PI)*6.0 if kitchen_feedback>0.0 else 0.0
+	game.draw_texture_rect_region(FOOD_ART,Rect2(basket-Vector2(basket_size/2,basket_size/2+bounce),Vector2.ONE*basket_size),Rect2(256,0,64,64))
+	if kitchen_feedback>0.0:
+		var fx := Color("d9f3a6") if kitchen_good else Color("ff9474")
+		var alpha := clampf(kitchen_feedback/0.42,0,1)
+		game.draw_arc(basket,32+(1-alpha)*18,0,TAU,32,Color(fx,alpha),3)
+		game.text(basket+Vector2(-39,-43),"+1" if kitchen_good else "¡Error!",17,fx,true,78,HORIZONTAL_ALIGNMENT_CENTER)
 	for i in range(5):
-		var lane := Rect2(lane_x + i * lane_width, lane_y, lane_width - 8, lane_h)
-		game.draw_rect(lane, Color("3a5346"))
-		btn(game,Rect2(lane.position.x, lane.end.y + (18 if vertical else 33), lane.size.x, 60 if vertical else 44),str(i+1),str(i))
-		if vertical:
-			game.clickables.append({"rect":game.mini_hit(lane), "id":"activity:" + str(i)})
-	for item in falling:
-		var p := Vector2(lane_center + item.lane * lane_width, lane_y + 20 + item.y * (lane_h - 50))
-		match int(item.icon):
-			0:
-				game.draw_rect(Rect2(p-Vector2(18,9),Vector2(36,17)), Color("be8045"))
-				for cut in [-9,0,9]: game.draw_line(p+Vector2(cut,-7),p+Vector2(cut-4,3),Color("f5cd83"),2)
-			1:
-				game.draw_circle(p+Vector2(-6,1),10,Color("ce5847"))
-				game.draw_circle(p+Vector2(6,1),10,Color("ce5847"))
-				game.draw_line(p+Vector2(0,-5),p+Vector2(5,-15),Color("92b871"),4)
-			2:
-				game.draw_line(p+Vector2(-12,12),p+Vector2(9,-10),Color("babdb8"),7)
-				game.draw_arc(p+Vector2(9,-10),8,0.15,4.65,10,Color("babdb8"),4)
-			3:
-				game.draw_circle(p+Vector2(0,-4),13,Color("699f4a"))
-				game.draw_rect(Rect2(p+Vector2(-3,4),Vector2(7,12)),Color("abd075"))
-		game.text(p+Vector2(-53,30),["Pan","Fruta","Llave","Verdura"][item.icon],15,Color("fff1cf"),true,106,HORIZONTAL_ALIGNMENT_CENTER)
-	game.draw_rect(Rect2(lane_center + player_lane * lane_width - 28.5, lane_y + lane_h - 23, 57, 17),Color("f2c97a"))
+		var x := field.position.x+i*stride
+		var target := Rect2(x,field.position.y,stride,field.size.y)
+		game.clickables.append({"rect":game.mini_hit(target),"id":"activity:"+str(i)})
+		var r := Rect2(x+3,field.end.y+10,stride-6,54 if vertical else 43)
+		btn(game,r,str(i+1),str(i))
+	game.text(Vector2(24,697) if vertical else Vector2(25,509),"Toca el puesto o usa 1–5 / flechas.",15,Color("f7d58f"))
 
 func draw_agenda(game: Control, vertical: bool) -> void:
 	game.text(Vector2(30,47), "Orden del día" if vertical else "Organización · Orden del día", 28)
