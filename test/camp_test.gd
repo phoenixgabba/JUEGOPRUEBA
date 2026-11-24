@@ -162,9 +162,9 @@ func run() -> void:
 	main.s.player = CampWorld.ORGANIZATION
 	main.interact()
 	main.close_dialog()
-	check(main.screen == "result", "pantalla de final de día")
+	check(main.screen == "play" and main.s.phase == "return_tent", "final de día deja la plaza abierta")
 	var loaded := CampState.new()
-	check(loaded.load_game() and loaded.phase == "finished" and loaded.tents == 25 and loaded.commissions == 3, "guardado y recuperación")
+	check(loaded.load_game() and loaded.phase == "return_tent" and loaded.tents == 25 and loaded.commissions == 3, "guardado y recuperación")
 	loaded.reset_save()
 	print("[acampada-tests] PASS: asamblea, almacén, cinco tiendas propias, tres comisiones, donaciones, 25 tiendas y guardado")
 	quit(0)

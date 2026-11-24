@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://5vgui13yy08s"
-path="res://.godot/imported/plaza_satelital.svg-f5d97402f03193d2a44cc7a745c6d3bc.ctex"
+uid="uid://b1l7uw811n8kb"
+path="res://.godot/imported/plaza_satelital.png-7d457708e0323d59d0a1a9d1bd8202c0.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/acampada/plaza_satelital.svg"
-dest_files=["res://.godot/imported/plaza_satelital.svg-f5d97402f03193d2a44cc7a745c6d3bc.ctex"]
+source_file="res://assets/acampada/plaza_satelital.png"
+dest_files=["res://.godot/imported/plaza_satelital.png-7d457708e0323d59d0a1a9d1bd8202c0.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false
