@@ -49,9 +49,10 @@ func finish_day_two_commission(index: int) -> void:
 		day_two_commissions += 1
 
 func clock_hour() -> int:
-	if day == 2: return 22 if phase == "finished" else mini(21, 9 + floori((tents - 25) * 0.48))
 	if phase == "wake": return 9
 	if phase in ["finished", "return_tent"]: return 22
+	if day == 3: return 9
+	if day == 2: return mini(21, 9 + floori((tents - 25) * 0.48))
 	return [16, 17, 19, 21][commissions]
 
 func daylight() -> String:
@@ -92,7 +93,7 @@ func load_game() -> bool:
 	var d = JSON.parse_string(f.get_as_text())
 	if not d is Dictionary or int(d.get("version", 0)) not in [1, 2, 3, 4]: return false
 	phone.restore(d.get("phone", {}))
-	day = clampi(int(d.get("day", 1)), 1, 2)
+	day = clampi(int(d.get("day", 1)), 1, 3)
 	day_two_commissions = clampi(int(d.get("day_two_commissions", 0)), 0, 5)
 	# Earlier Day 2 saves opened Redes through Accesibilidad in index order.
 	day_two_completed = clampi(int(d.get("day_two_completed", (1 << day_two_commissions) - 1)), 0, 31)
@@ -120,7 +121,7 @@ func load_game() -> bool:
 	cash = int(d.get("cash", 12))
 	people = int(d.get("people", 4))
 	capacity = int(d.get("capacity", 0))
-	tents = clampi(int(d.get("tents", 0)), 0, 50 if day == 2 else 25)
+	tents = clampi(int(d.get("tents", 0)), 0, 50 if day >= 2 else 25)
 	pitch_swaps = d.get("pitch_swaps", {})
 	commissions = clampi(int(d.get("commissions", 0)), 0, 3)
 	delivery = str(d.get("delivery", ""))
@@ -141,7 +142,7 @@ func load_game() -> bool:
 			elif tents == 25:
 				phase = "expansion"
 				delivery = "close"
-	if day == 1 and phase == "finished": phase = "return_tent"
+	if day <= 2 and phase == "finished": phase = "return_tent"
 	return true
 
 func reset_save() -> void:

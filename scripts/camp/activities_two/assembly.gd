@@ -1,275 +1,203 @@
 extends "res://scripts/camp/activities_two/session.gd"
 
-const MAT_ART := preload("res://assets/visual/assembly_mat.png")
 const AXES := ["Acceso", "Cuidados", "Difusión", "Descanso"]
-const NAMES := ["Patricia", "Alejandro", "Marina", "Núria"]
-const EVENTS := ["Redes", "Seguridad", "Convivencia", "Punto sanitario", "Accesibilidad", "Acuerdo final"]
-const TOPICS := [
-	["Hace falta señalizar la entrada.", "Organicemos un punto de apoyo.", "Compartamos el boletín.", "Necesitamos turnos de descanso."],
-	["Dejemos un corredor libre.", "Acompañemos a quien lo necesite.", "Expliquemos cómo pedir ayuda.", "Repartamos las guardias."],
-	["No bloqueemos los pasos.", "Repartamos agua y materiales.", "Informemos de los cambios.", "Reservemos una zona tranquila."],
-	["Despejemos la ruta sanitaria.", "Preparemos un puesto de cuidados.", "Avisemos dónde pedir asistencia.", "Hagamos relevos en el puesto."],
-	["Revisemos los recorridos.", "Acompañemos a quien pida apoyo.", "Pongamos información accesible.", "Incluyamos zonas de reposo."],
-	["Mantengamos los accesos libres.", "Garanticemos apoyo mutuo.", "Compartamos los acuerdos.", "Organicemos descansos."]
-]
-const CHOICES := [
-	["Ruta libre y señalizada", "Puesto de apoyo mutuo", "Boletín e información", "Turnos y zona tranquila"],
-	["Corredor de seguridad", "Equipo de acompañamiento", "Punto de información", "Relevo de guardias"],
-	["Paso entre tiendas", "Reparto de material", "Panel de avisos", "Espacio de descanso"],
-	["Ruta sanitaria libre", "Puesto de cuidados", "Mapa de asistencia", "Relevos sanitarios"],
-	["Recorrido accesible", "Equipo de apoyo", "Señalización accesible", "Zona de reposo"],
-	["Accesos despejados", "Apoyo mutuo", "Acta abierta", "Turnos sostenibles"]
-]
-const SEATS := [Vector2(105,185),Vector2(335,185),Vector2(105,292),Vector2(335,292)]
-var chapter := 0
-var phase := "queue"
-var queue: Array[int] = []
-var heard: Array[int] = []
-var speaker := -1
-var speech := 0.0
-var duration := 3.2
-var patience := 1.0
-var interruption := -1
-var interruption_time := 0.0
-var interruption_pending := false
-var round_good := 0
-var round_errors := 0
-var total_good := 0
-var total_errors := 0
-var round_support := 0
-var consensus := 0
+const PALETTE := [Color("75b8cf"),Color("ec9084"),Color("e8bf68"),Color("b49bd4")]
+const SIDE := 6
+const GOAL := 30
+const ORIGIN := Vector2(79,112)
+const STEP := 47.0
+var board: Array[int] = []
+var selected := -1
+var cursor := 0
+var cleared := 0
+var moves := 0
+var errors := 0
+var chain := 0
+var best_chain := 0
 var tally := [0,0,0,0]
-var votes: Array[int] = []
-var vote_timer := 0.0
-var chosen := -1
+var pending: Array[int] = []
+var resolve_timer := 0.0
+var hint := Vector2i(-1,-1)
 
 func initialize(seed_value: int, plan: String) -> void:
 	super.initialize(seed_value,plan)
-	title = "Asamblea · toma la palabra"
-	help = "Pulsa a quien levanta la mano para darle turno. Cierra el turno en la zona verde y media si alguien interrumpe."
-	setup_round()
+	title = "Asamblea · construye acuerdos"
+	help = "Intercambia dos fichas vecinas y junta 3 o más iguales. Completa 30 propuestas."
+	make_board()
 
-func setup_round() -> void:
-	phase = "queue"
-	queue.clear()
-	heard.clear()
-	votes.clear()
-	speaker = -1
-	interruption = -1
-	interruption_pending = false
-	interruption_time = 0.0
-	patience = 1.0
-	round_good = 0
-	round_errors = 0
-	chosen = -1
-	var order: Array[int] = [0,1,2,3]
-	for i in range(3,0,-1):
-		var j := rng.randi_range(0,i)
-		var saved := order[i]
-		order[i] = order[j]
-		order[j] = saved
-	for i in range(3):
-		queue.append(order[i])
-	notice = "Da paso a la primera mano levantada."
+func make_board() -> void:
+	while true:
+		board.clear()
+		for i in range(SIDE*SIDE):
+			var allowed: Array[int] = [0,1,2,3]
+			if i%SIDE >= 2 and board[i-1] == board[i-2]: allowed.erase(board[i-1])
+			if i >= SIDE*2 and board[i-SIDE] == board[i-SIDE*2]: allowed.erase(board[i-SIDE])
+			board.append(allowed[rng.randi_range(0,allowed.size()-1)])
+		if find_move().x >= 0: break
+	selected = -1
+	hint = Vector2i(-1,-1)
 
-func start_speech(person: int) -> void:
-	queue.erase(person)
-	speaker = person
-	phase = "speech"
-	speech = 0.0
-	duration = maxf(2.7,3.8-float(chapter)*0.15)
-	interruption = -1
-	interruption_time = 0.0
-	interruption_pending = chapter > 0 or heard.size() == 1
-	notice = TOPICS[chapter][speaker]
+func matches() -> Array[int]:
+	var found: Array[int] = []
+	for i in range(SIDE*SIDE):
+		if i%SIDE <= SIDE-3 and board[i] == board[i+1] and board[i] == board[i+2]:
+			for k in range(3):
+				if not found.has(i+k): found.append(i+k)
+		if i < SIDE*(SIDE-2) and board[i] == board[i+SIDE] and board[i] == board[i+2*SIDE]:
+			for k in range(3):
+				if not found.has(i+k*SIDE): found.append(i+k*SIDE)
+	return found
 
-func close_speech(good: bool) -> void:
-	if good:
-		round_good += 1
-		total_good += 1
-	else:
-		round_errors += 1
-		total_errors += 1
-	heard.append(speaker)
-	speaker = -1
-	interruption = -1
-	interruption_pending = false
-	if queue.is_empty():
-		phase = "vote"
-		votes.assign(heard)
-		notice = "¡A votar! Elige una propuesta que recoja las intervenciones."
-	else:
-		phase = "queue"
-		patience = 1.0
-		notice = "Buen turno. Da paso a la siguiente mano." if good else "Turno cerrado. Recupera el orden."
+func exchange(a: int,b: int) -> void:
+	var temp := board[a]
+	board[a] = board[b]
+	board[b] = temp
+
+func find_move() -> Vector2i:
+	for i in range(SIDE*SIDE):
+		for shift in [1,SIDE]:
+			if shift == 1 and i%SIDE == SIDE-1: continue
+			var j: int = i+shift
+			if j >= board.size(): continue
+			exchange(i,j)
+			var valid := not matches().is_empty()
+			exchange(i,j)
+			if valid: return Vector2i(i,j)
+	return Vector2i(-1,-1)
+
+func adjacent(a: int,b: int) -> bool:
+	return (absi(a-b)==1 and floori(float(a)/SIDE)==floori(float(b)/SIDE)) or absi(a-b)==SIDE
 
 func perform(value: String) -> void:
-	if phase == "queue" and value.begins_with("delegate:"):
-		var person := int(value.get_slice(":",1))
-		if person not in queue: return
-		if person != queue[0]:
-			round_errors += 1
-			total_errors += 1
-			feedback("Respeta el orden de las manos.",SEATS[person],true)
-			return
-		if tutorial: trained()
-		start_speech(person)
-	elif phase == "speech":
-		if value == "mediate" and interruption >= 0:
-			interruption = -1
-			interruption_time = 0.0
-			feedback("¡Turno protegido!")
-		elif value == "close":
-			var ratio := speech/duration
-			var good := ratio >= 0.68 and ratio <= 0.93 and interruption < 0
-			close_speech(good)
-			feedback("¡Buen cierre!" if good else "Fuera de tiempo.",Vector2(220,340),not good)
-	elif phase == "vote" and value.begins_with("vote:"):
-		var axis := int(value.get_slice(":",1))
-		if axis < 0 or axis >= 4: return
-		chosen = axis
-		round_support = clampi(1+round_good-int(round_errors>0)+int(axis in heard),1,4)
-		consensus += round_support
-		tally[axis] += round_support+1
-		for person in heard:
-			tally[person] += 1
-		score = clampi(roundi(float(consensus)*100.0/24.0)-total_errors,0,100)
-		phase = "result"
-		vote_timer = 1.8
-		feedback("%d de 4 apoyos. Acuerdo en el acta." % round_support)
-	elif phase == "result" and value == "next":
-		next_round()
+	if not pending.is_empty(): return
+	if value == "hint":
+		hint = find_move()
+		notice = "Intercambia las dos fichas marcadas."
+		return
+	if not value.begins_with("tile:"): return
+	var i := int(value.get_slice(":",1))
+	if i < 0 or i >= board.size(): return
+	cursor = i
+	if selected == i:
+		selected = -1
+		return
+	if selected < 0 or not adjacent(selected,i):
+		selected = i
+		return
+	var previous := selected
+	selected = -1
+	hint = Vector2i(-1,-1)
+	exchange(previous,i)
+	pending = matches()
+	if pending.is_empty():
+		exchange(previous,i)
+		errors += 1
+		feedback("Necesitas una línea de tres. Prueba otra combinación.",tile_center(i),true)
+		return
+	if tutorial: trained()
+	moves += 1
+	chain = 1
+	resolve_timer = 0.25
+	notice = "¡Acuerdo! Las propuestas se combinan."
 
-func next_round() -> void:
-	chapter += 1
-	if chapter >= EVENTS.size():
-		var best := tally.find(tally.max())
-		result.plan = AXES[best]
-		finish(score,"Prioridad acordada: %s. %d/24 apoyos · %d turnos bien moderados. Redes abre la primera ronda de llegadas." % [AXES[best],consensus,total_good])
-	else:
-		setup_round()
+func tile_center(i: int) -> Vector2:
+	return ORIGIN+Vector2(i%SIDE,floori(float(i)/SIDE))*STEP+Vector2.ONE*STEP/2
 
 func advance(delta: float) -> void:
-	match phase:
-		"queue":
-			patience -= delta/(5.2-float(chapter)*0.3)
-			if patience <= 0.0:
-				round_errors += 1
-				total_errors += 1
-				patience = 1.0
-				feedback("La asamblea espera. Da paso al siguiente turno.",Vector2(220,320),true)
-		"speech":
-			if interruption >= 0:
-				interruption_time -= delta
-				if interruption_time <= 0.0:
-					interruption = -1
-					round_errors += 1
-					total_errors += 1
-					feedback("Se han solapado dos voces.",Vector2(220,245),true)
-				return
-			speech += delta
-			if interruption_pending and speech >= duration*0.35:
-				interruption_pending = false
-				interruption = queue[0] if not queue.is_empty() else (speaker+1)%4
-				interruption_time = maxf(0.85,1.6-float(chapter)*0.10)
-				notice = "¡Dos voces a la vez! Pulsa Mediar."
-				return
-			if speech >= duration:
-				close_speech(false)
-				feedback("El turno se ha alargado demasiado.",Vector2(220,340),true)
-		"result":
-			vote_timer -= delta
-			if vote_timer <= 0.0: next_round()
+	if pending.is_empty(): return
+	resolve_timer -= delta
+	if resolve_timer > 0: return
+	for i in pending:
+		tally[board[i]] += 1
+		cleared += 1
+		board[i] = -1
+	best_chain = maxi(best_chain,chain)
+	feedback("¡%d propuestas! %s" % [pending.size(),"Combo x%d" % chain if chain > 1 else "Acuerdo colectivo"],tile_center(pending[0]))
+	for x in range(SIDE):
+		var dest := SIDE-1
+		for y in range(SIDE-1,-1,-1):
+			var i := y*SIDE+x
+			if board[i] < 0: continue
+			board[dest*SIDE+x] = board[i]
+			dest -= 1
+		for y in range(dest,-1,-1):
+			board[y*SIDE+x] = rng.randi_range(0,3)
+	pending = matches()
+	if not pending.is_empty():
+		chain += 1
+		resolve_timer = 0.28
+		return
+	if cleared >= GOAL:
+		var best: int = tally.find(tally.max())
+		result.plan = AXES[best]
+		finish(clampi(100-errors*3-maxi(0,moves-10)*2,0,100),"Prioridad acordada: %s. %d propuestas · combo máximo x%d. Redes abre la primera ronda de llegadas." % [AXES[best],cleared,best_chain])
+		return
+	if find_move().x < 0:
+		make_board()
+		notice = "Nuevas propuestas sobre la mesa."
 
 func key(code: int) -> void:
 	super.key(code)
 	if report: return
-	if code >= KEY_1 and code <= KEY_4:
-		var index := code-KEY_1
-		if phase == "queue": action("delegate:%d"%index)
-		elif phase == "vote": action("vote:%d"%index)
-	elif code == KEY_SPACE: action("close")
-	elif code == KEY_M: action("mediate")
-	elif code == KEY_ENTER and phase == "result": action("next")
+	match code:
+		KEY_LEFT: cursor = maxi(0,cursor-1)
+		KEY_RIGHT: cursor = mini(SIDE*SIDE-1,cursor+1)
+		KEY_UP: cursor = maxi(0,cursor-SIDE)
+		KEY_DOWN: cursor = mini(SIDE*SIDE-1,cursor+SIDE)
+		KEY_SPACE,KEY_ENTER: action("tile:%d"%cursor)
+		KEY_H: action("hint")
 
 func status() -> String:
-	return "Ronda %d/6 · %d apoyos · %d errores" % [mini(chapter+1,6),consensus,total_errors]
+	return "%d/%d propuestas · %d movimientos · combo x%d" % [mini(cleared,GOAL),GOAL,moves,best_chain]
+
+func draw_symbol(game: Control,p: Vector2,kind: int,r: float) -> void:
+	var color: Color = PALETTE[kind]
+	match kind:
+		0:
+			game.draw_line(p+Vector2(-r,0),p+Vector2(r,0),color,4)
+			game.draw_line(p+Vector2(r*0.2,-r*0.65),p+Vector2(r,0),color,4)
+			game.draw_line(p+Vector2(r,0),p+Vector2(r*0.2,r*0.65),color,4)
+		1:
+			game.draw_circle(p+Vector2(-r*0.45,-r*0.22),r*0.58,color)
+			game.draw_circle(p+Vector2(r*0.45,-r*0.22),r*0.58,color)
+			game.draw_colored_polygon(PackedVector2Array([p+Vector2(-r,-r*0.1),p+Vector2(r,-r*0.1),p+Vector2(0,r)]),color)
+		2:
+			game.draw_colored_polygon(PackedVector2Array([p+Vector2(-r,-r*0.3),p+Vector2(r*0.65,-r),p+Vector2(r*0.65,r),p+Vector2(-r,r*0.3)]),color)
+			game.draw_line(p+Vector2(-r*0.6,r*0.2),p+Vector2(-r*0.3,r),color,4)
+			game.draw_line(p+Vector2(r*0.85,-r*0.4),p+Vector2(r*1.25,-r*0.7),color,2)
+		3:
+			game.draw_circle(p,r,color)
+			game.draw_circle(p+Vector2(r*0.45,-r*0.35),r*0.85,INK)
 
 func scene(game: Control) -> void:
-	backdrop(game,Vector2(615,428),Color(0.15,0.17,0.12,0.25))
-	item(game,MAT_ART,Vector2(220,236),Vector2(250,240))
-	item(game,game.World.TABLE,Vector2(220,239),Vector2(92,75))
-	game.draw_rect(Rect2(27,91,386,36),INK)
-	game.text(Vector2(35,115),EVENTS[mini(chapter,5)],21,GOLD,true,370,HORIZONTAL_ALIGNMENT_CENTER)
-	for i in range(4):
-		var p: Vector2 = SEATS[i]
-		var current := i == speaker
-		var waiting := i in queue and phase in ["queue","speech"]
-		if current:
-			game.draw_circle(p-Vector2(0,28),43,Color(GREEN,0.23))
-			game.draw_arc(p-Vector2(0,28),43,0,TAU,40,GREEN,3)
-		elif waiting:
-			game.draw_circle(p-Vector2(0,28),39,Color(GOLD,0.20))
-		actor(game,p,i,1.65,current)
-		game.draw_rect(Rect2(p+Vector2(-58,4),Vector2(116,24)),INK)
-		game.text(p+Vector2(-58,21),NAMES[i],15,CREAM,true,116,HORIZONTAL_ALIGNMENT_CENTER)
-		if waiting:
-			var position := queue.find(i)+1
-			var bob := sin(clock*7.0)*3.0
-			var badge := p+Vector2(29,-67+bob)
-			game.draw_circle(badge,16,GOLD)
-			game.text(badge+Vector2(-16,6),str(position),19,INK,true,32,HORIZONTAL_ALIGNMENT_CENTER)
-			if phase == "queue": hit(game,Rect2(p-Vector2(61,84),Vector2(122,112)),"delegate:%d"%i)
-		if i in heard:
-			game.draw_circle(p+Vector2(-31,-57),10,GREEN)
-			game.text(p+Vector2(-41,-52),"✓",14,INK,true,20,HORIZONTAL_ALIGNMENT_CENTER)
-		if i == interruption:
-			game.draw_circle(p+Vector2(30,-64),17,RED)
-			game.text(p+Vector2(13,-58),"!",24,INK,true,34,HORIZONTAL_ALIGNMENT_CENTER)
-	game.draw_rect(Rect2(25,328,390,66),INK)
-	match phase:
-		"queue":
-			game.text(Vector2(37,350),"TURNO DE PALABRA",16,GOLD,true)
-			meter(game,Vector2(37,364),366,patience,GOLD)
-			game.text(Vector2(37,387),"Escoge la mano número 1",16,CREAM)
-		"speech":
-			game.text(Vector2(37,350),"ESCUCHA · CIERRA EN VERDE",16,GREEN,true)
-			var bar := Rect2(37,361,366,17)
-			game.draw_rect(bar,Color("55504c"))
-			game.draw_rect(Rect2(bar.position+Vector2(bar.size.x*0.68,0),Vector2(bar.size.x*0.25,17)),GREEN)
-			var cursor := bar.position.x+bar.size.x*clampf(speech/duration,0,1)
-			game.draw_rect(Rect2(cursor-3,bar.position.y-4,6,25),CREAM)
-			if interruption >= 0:
-				game.draw_rect(bar,Color(RED,0.65))
-				game.text(Vector2(37,391),"¡MEDIA AHORA!",15,RED,true)
-		"vote":
-			game.text(Vector2(37,353),"BUSCA UN ACUERDO",18,GOLD,true)
-			game.text(Vector2(37,378),"%d intervenciones · %d bien moderadas" % [heard.size(),round_good],16,CREAM)
-		"result":
-			game.text(Vector2(37,353),"ACUERDO · %d/4 APOYOS"%round_support,19,GREEN,true)
-			game.text(Vector2(37,379),AXES[chosen],18,CREAM)
+	game.draw_rect(VIEW,Color("4d5146"))
+	game.draw_rect(Rect2(65,99,310,303),Color("896c4d"))
+	game.draw_rect(Rect2(72,105,296,292),INK)
+	for i in range(board.size()):
+		var p := tile_center(i)
+		var r := Rect2(p-Vector2.ONE*21,Vector2.ONE*42)
+		var color: Color = PALETTE[board[i]]
+		game.draw_rect(Rect2(r.position+Vector2(0,3),r.size),Color("101e20"))
+		game.draw_rect(r,Color("304448"))
+		game.draw_rect(r,Color(color,0.18))
+		draw_symbol(game,p,board[i],12)
+		if i in pending:
+			game.draw_rect(r,Color(color,0.6))
+			game.draw_rect(r,CREAM,false,3)
+		elif selected == i or hint.x == i or hint.y == i:
+			game.draw_rect(r,GOLD,false,3)
+		elif cursor == i:
+			game.draw_rect(r,Color(CREAM,0.5),false,1)
+		hit(game,r,"tile:%d"%i)
+	if chain > 1 and not pending.is_empty():
+		game.text(Vector2(0,105),"COMBO x%d"%chain,21,GOLD,true,440,HORIZONTAL_ALIGNMENT_CENTER)
 
 func controls(game: Control) -> void:
-	match phase:
-		"queue":
-			game.text(Vector2(20,484),"¿Quién tiene el siguiente turno?",20,GOLD,true)
-			for i in range(4):
-				var rect := Rect2(20+(i%2)*202,504+floori(float(i)/2)*65,194,58)
-				var caption: String = NAMES[i]
-				if i in queue: caption = "%d · %s"%[queue.find(i)+1,NAMES[i]]
-				button(game,rect,caption,"delegate:%d"%i,i in queue,17)
-		"speech":
-			game.text(Vector2(20,486),"Habla: "+NAMES[speaker],22,GOLD,true)
-			button(game,Rect2(20,510,400,68),"Cerrar turno · Espacio","close",interruption<0,22)
-			button(game,Rect2(20,590,400,76),"Mediar · M","mediate",interruption>=0,23)
-			if interruption >= 0:
-				meter(game,Vector2(28,673),384,interruption_time/1.6,RED)
-		"vote":
-			game.text(Vector2(20,483),"¿Qué acordamos?",20,GOLD,true)
-			for i in range(4):
-				var caption: String = CHOICES[chapter][i]
-				if i in heard: caption += " · ✓"
-				button(game,Rect2(20,495+i*47,400,43),caption,"vote:%d"%i,i in heard,17)
-		"result":
-			game.text(Vector2(20,493),"Acuerdo incorporado al acta",21,GREEN,true)
-			button(game,Rect2(20,550,400,70),"Siguiente punto","next",true,23)
+	game.text(Vector2(20,482),"Acta de propuestas",21,GOLD,true)
+	for i in range(4):
+		var p := Vector2(40+(i%2)*202,517+floori(float(i)/2)*51)
+		draw_symbol(game,p,i,10)
+		game.text(p+Vector2(22,5),"%s · %d" % [AXES[i],tally[i]],17,CREAM,true)
+	game.text(Vector2(20,613),"Acuerdos: %d / %d" % [mini(cleared,GOAL),GOAL],17,GREEN,true)
+	meter(game,Vector2(20,622),400,float(cleared)/GOAL,GREEN)
+	button(game,Rect2(20,641,400,48),"Mostrar combinación · H","hint",false,18)
