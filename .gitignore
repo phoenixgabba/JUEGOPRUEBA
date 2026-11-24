@@ -28,3 +28,8 @@ node_modules/
 !/assets/acampada/*.png
 !/assets/template/**/*.png
 !/assets/template/**/*.woff2
+
+# Visual update assets
+!/assets/acampada/*.svg
+!/assets/visual/*.png
+!/assets/art_v2/*.png

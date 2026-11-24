@@ -1,5 +1,9 @@
 extends "res://scripts/camp/activities_two/session.gd"
 
+const PAVING := preload("res://assets/visual/paving.png")
+const BLOCKED_ART := preload("res://assets/visual/blocked.png")
+const CRATE_ART := preload("res://assets/visual/crate.png")
+
 const BOARD := Rect2(20,90,400,310)
 const JOY := Vector2(91,552)
 const DIRS := [Vector2i(1,0),Vector2i(0,1),Vector2i(-1,0),Vector2i(0,-1)]
@@ -186,15 +190,15 @@ func scene(game: Control) -> void:
 			var p := center(tile)
 			var r := Rect2(p-Vector2.ONE*unit/2,Vector2.ONE*unit)
 			if open_cells.has(tile):
-				game.draw_rect(r,Color("d0bd96") if (x+y)%2==0 else Color("cbb58b"))
+				game.draw_texture_rect(PAVING,r,false)
 			elif narrow.has(tile):
-				game.draw_rect(r,Color("d0bd96"))
-				for side in [-1,1]: game.draw_rect(Rect2(p+Vector2(side*unit*0.41-unit*0.08,-unit*0.22),Vector2(unit*0.16,unit*0.44)),Color("a06647"))
+				game.draw_texture_rect(PAVING,r,false)
+				for side in [-1,1]: item(game,CRATE_ART,p+Vector2(side*unit*0.41,0),Vector2(unit*0.24,unit*0.53))
 			else:
-				game.draw_rect(r,Color("47705d"))
+				game.draw_texture_rect(BLOCKED_ART,r,false)
 				if (x+2*y)%4==0: item(game,game.World.TENT,p,Vector2(unit*1.04,unit))
 				elif (2*x+y)%3==0: item(game,game.World.TABLE,p,Vector2(unit*0.84,unit*0.72))
-				else: game.draw_rect(r.grow(-unit*0.22),Color("916549"))
+				else: item(game,CRATE_ART,p,Vector2(unit*0.85,unit*0.85))
 	var goal := center(destination)
 	item(game,game.World.TENT,goal,Vector2(unit*1.03,unit))
 	game.draw_arc(goal,unit*0.46,0,TAU,20,GOLD,3)

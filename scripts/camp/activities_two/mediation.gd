@@ -93,41 +93,17 @@ func scene(game: Control) -> void:
 			flip = maxf(0.05,absf(1-2*progress))
 			if progress<0.5: facing = not turnover[i].face
 		var display := Rect2(r.get_center()-Vector2(r.size.x*flip,r.size.y)/2,Vector2(r.size.x*flip,r.size.y))
-		game.draw_rect(display,Color("e0d5ad") if facing else Color("305b51"))
-		game.draw_rect(display,GOLD if matched.has(i) else CREAM,false,2)
+		game.draw_texture_rect(preload("res://assets/art_v2/card_face.png") if facing else preload("res://assets/art_v2/card_back.png"), display, false)
+		if matched.has(i): game.draw_rect(display.grow(-2), GOLD, false, 2)
 		if flip>0.63:
 			if facing:
 				draw_item(game,deck[i],display.get_center()-Vector2(0,7))
 				game.text(display.position+Vector2(0,display.size.y-8),ITEMS[deck[i]],11,INK,true,display.size.x,HORIZONTAL_ALIGNMENT_CENTER)
-			else:
-				var center := display.get_center()
-				game.draw_rect(display.grow(-6),Color("8aa777"),false,1)
-				game.draw_colored_polygon(PackedVector2Array([center+Vector2(0,-17),center+Vector2(19,14),center+Vector2(-19,14)]),GOLD)
-				game.draw_line(center+Vector2(0,-17),center+Vector2(0,14),INK,2)
 		hit(game,r,"card:%d"%i)
 
 func draw_item(game: Control, id: int, p: Vector2) -> void:
-	if id<5:
-		var graphics: Array = [game.World.TENT,game.World.TABLE,game.World.TARP,game.World.PEGS,game.World.POLES]
-		item(game,graphics[id],p,Vector2(43,39))
-		return
-	var colors := [Color("b65d59"),Color("477b9b"),Color("a36d45"),Color("7865a0"),Color("514d64")]
-	var c: Color = colors[id-5]
-	match id:
-		5:
-			game.draw_rect(Rect2(p-Vector2(17,13),Vector2(34,26)),c)
-			for i in range(3): game.draw_rect(Rect2(p+Vector2(-17,-8+7*i),Vector2(34,3)),GOLD)
-		6:
-			game.draw_rect(Rect2(p-Vector2(10,12),Vector2(20,28)),c)
-			game.draw_rect(Rect2(p-Vector2(5,17),Vector2(10,7)),INK)
-			game.draw_rect(Rect2(p-Vector2(8,3),Vector2(16,9)),Color("bde0ea"))
-		7:
-			game.draw_rect(Rect2(p-Vector2(14,13),Vector2(28,28)),c)
-			game.draw_rect(Rect2(p-Vector2(8,17),Vector2(16,5)),INK)
-			game.draw_rect(Rect2(p-Vector2(10,1),Vector2(20,9)),GOLD)
-		8:
-			game.draw_colored_polygon(PackedVector2Array([p+Vector2(-15,-7),p+Vector2(14,-17),p+Vector2(14,11),p+Vector2(-15,3)]),c)
-			game.draw_rect(Rect2(p-Vector2(7,-3),Vector2(7,11)),INK)
-		9:
-			game.draw_rect(Rect2(p-Vector2(10,9),Vector2(20,26)),c)
-			game.draw_rect(Rect2(p-Vector2(14,16),Vector2(28,9)),GOLD)
+	var names := ["tent", "table", "tarp", "pegs", "poles", "blanket", "canteen", "backpack", "megaphone", "flashlight"]
+	var tex := load("res://assets/art_v2/%s.png" % names[id]) as Texture2D
+	if tex == null: return
+	var scale_factor := minf(49.0 / tex.get_width(), 39.0 / tex.get_height())
+	item(game, tex, p, tex.get_size() * scale_factor)

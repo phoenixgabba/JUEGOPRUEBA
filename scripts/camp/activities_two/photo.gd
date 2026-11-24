@@ -48,7 +48,12 @@ func draw_photo(game: Control, shot: Dictionary, crop: Vector2) -> void:
 	var framing := Vector2(float(shot.x),float(shot.y))-crop
 	var magnification := 1+focal*0.22
 	backdrop(game,SITES[subject]+framing*0.34,Color(0,0.08,0.08,0.08),Vector2(224,165)/magnification)
-	game.draw_rect(CAMERA,GOLD,false,2)
+	game.draw_rect(CAMERA,Color("20232b"),false,3)
+	for corner in [CAMERA.position,CAMERA.position+Vector2(CAMERA.size.x,0),CAMERA.end,CAMERA.position+Vector2(0,CAMERA.size.y)]:
+		var sx := 1.0 if corner.x==CAMERA.position.x else -1.0
+		var sy := 1.0 if corner.y==CAMERA.position.y else -1.0
+		game.draw_line(corner,corner+Vector2(sx*15,0),Color.WHITE,2,true)
+		game.draw_line(corner,corner+Vector2(0,sy*15),Color.WHITE,2,true)
 	var p := Vector2(220,232)+(subject_position(subject,float(shot.time))-Vector2(220,232)-framing)*magnification
 	for i in range(3):
 		var at := p + Vector2(22*i-20,15*(i%2))

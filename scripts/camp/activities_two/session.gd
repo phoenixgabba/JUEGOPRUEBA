@@ -115,7 +115,8 @@ func draw(game: Control) -> void:
 	game.mini_rect = Rect2(origin, layout * scale)
 	game.draw_set_transform(origin, 0, Vector2.ONE * scale)
 	game.drawing_mini = true
-	game.panel(Rect2(Vector2.ZERO, layout), INK, Color("b79b67"))
+	game.panel(Rect2(Vector2.ZERO, layout), Color("22252e"), Color("bfa477"))
+	game.draw_line(Vector2(18,49),Vector2(layout.x-82,49),Color("665a47"),1)
 	var title_width: float = game.BOLD.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 25).x
 	var title_size := mini(25, floori(25 * (layout.x - 88) / maxf(1, title_width)))
 	game.text(Vector2(18, 35), title, title_size, GOLD, true)

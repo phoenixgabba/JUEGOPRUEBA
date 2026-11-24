@@ -1,5 +1,7 @@
 extends "res://scripts/camp/activities_two/session.gd"
 
+const MAT_ART := preload("res://assets/visual/assembly_mat.png")
+
 const AXES := ["Acceso", "Cuidados", "Difusión", "Descanso"]
 const NAMES := ["Patricia", "Alejandro", "Marina", "Núria"]
 const PACKAGES := [
@@ -139,8 +141,7 @@ func status() -> String:
 
 func scene(game: Control) -> void:
 	backdrop(game,Vector2(615,428),Color(0.15,0.17,0.12,0.15))
-	game.draw_circle(Vector2(219,214),99,Color("676449"))
-	game.draw_arc(Vector2(219,214),95,0,TAU,48,GOLD,3)
+	item(game,MAT_ART,Vector2(219,214),Vector2(210,210))
 	item(game,game.World.TABLE,Vector2(215,224),Vector2(99,78))
 	var coverage := effects()
 	for i in range(4):

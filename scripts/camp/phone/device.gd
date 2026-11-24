@@ -7,18 +7,19 @@ const Data = preload("res://scripts/camp/phone/data.gd")
 const Photo = preload("res://scripts/camp/activities_two/photo.gd")
 const APPS := [
 	["contacts","Contactos","●","799b94"],["social","Instagram","◎","ab5475"],["messages","Mensajes","▰","509873"],
-	["mail","Correo","✉","557caa"],["camera","Cámara","◉","73838e"],["gallery","Galería","▧","bd9450"],
+	["mail","Gmail","✉","557caa"],["camera","Cámara","◉","73838e"],["gallery","Galería","▧","bd9450"],
 	["map","Mapa","◆","729265"],["agenda","Agenda","▦","a27158"],["notes","Notas","≡","bc964d"],
 	["files","Archivos","■","558da3"],["settings","Ajustes","✦","76868b"],["clock","Reloj","◷","776b96"],
 ]
 const NAMES := {"home":"Acampada València","contacts":"Contactos","social":"Instagram · simulación","messages":"Mensajes",
-	"mail":"Correo","camera":"Cámara de la plaza","gallery":"Galería","map":"Mapa","agenda":"Agenda","notes":"Notas",
+	"mail":"Gmail · simulación","camera":"Cámara","gallery":"Fotos","map":"Mapa","agenda":"Agenda","notes":"Notas",
 	"files":"Archivos","settings":"Ajustes","clock":"Reloj","calls":"Teléfono","direct":"Mensajes directos",
 	"notices":"Notificaciones","compose":"Redactar","attachment":"Adjunto"}
 const FONTS := preload("res://assets/template/fonts/ui_regular.tres")
-const INK := Color("142e2d")
-const PAPER := Color("eff0db")
-const GOLD := Color("e8bd74")
+const INK := Color("171a20")
+const PAPER := Color("202124")
+const GOLD := Color("176bd1")
+const WALLPAPER := preload("res://assets/visual/phone_wallpaper.png")
 var game: Control
 var phone: Data
 var handset: Panel
@@ -65,10 +66,22 @@ func setup(owner_game: Control) -> void:
 	handset = Panel.new()
 	handset.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(handset)
-	handset.add_theme_stylebox_override("panel", style(INK,Color("899b82"),30,4))
+	handset.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	var frame := style(Color("090b0e"),Color("9da6b1"),43,3)
+	frame.shadow_color = Color(0,0,0,0.72)
+	frame.shadow_size = 12
+	frame.shadow_offset = Vector2(0,5)
+	handset.add_theme_stylebox_override("panel",frame)
 	handset.draw.connect(func():
-		if at=="home":
-			handset.draw_texture_rect(game.COVER,Rect2(Vector2(12,12),handset.size-Vector2(24,24)),false,Color(0.57,0.76,0.64,0.15)))
+		var screen := Rect2(Vector2(9,9),handset.size-Vector2(18,18))
+		handset.draw_style_box(style(screen_color(),Color("101217"),34,1),screen)
+		if at=="home": handset.draw_texture_rect(WALLPAPER,screen,false)
+		var island := Rect2(Vector2(handset.size.x/2-57,18),Vector2(114,27))
+		handset.draw_style_box(style(Color("08090b"),Color("171c24"),15,1),island)
+		handset.draw_circle(island.position+Vector2(96,13),4,Color("192231"))
+		handset.draw_circle(island.position+Vector2(95,12),1.5,Color("465a7f"))
+		var bar := Rect2(Vector2(handset.size.x/2-62,handset.size.y-22),Vector2(124,5))
+		handset.draw_style_box(style(foreground(),Color.TRANSPARENT,3),bar))
 	viewfinder = SubViewport.new()
 	viewfinder.size = Vector2i(480,316)
 	viewfinder.disable_3d = true
@@ -82,17 +95,49 @@ func setup(owner_game: Control) -> void:
 	add_child(notify_sound)
 	notify_sound.stream = game.CUE.tone(740,0.14,0.09,910)
 
+func is_dark() -> bool:
+	return at in ["home","camera","clock","notices"] or (at=="calls" and call_state in ["Entrante","Marcando","En llamada"])
+
+func foreground() -> Color:
+	return Color("f7f7fb") if is_dark() else PAPER
+
+func accent() -> Color:
+	if at=="notes" or at=="clock": return Color("f5b93b") if is_dark() else Color("936009")
+	if at=="calls" or at=="messages": return Color("25a951")
+	if at=="mail": return Color("1769c2")
+	if at=="social": return Color("1679e8")
+	if at=="agenda": return Color("d94b54")
+	return Color("76b7ff") if is_dark() else GOLD
+
+func screen_color() -> Color:
+	if at=="home": return Color("151b36")
+	if at=="camera": return Color("101116")
+	if at=="calls" and is_dark(): return Color("202a3c")
+	if at in ["clock","notices"]: return Color("171a24")
+	if at in ["social","mail","messages","contacts","gallery","files"]: return Color("ffffff")
+	if at=="notes": return Color("fffcf1")
+	return Color("f2f2f7")
+
 func make_theme() -> Theme:
 	var result := Theme.new()
 	result.default_font = FONTS
 	result.default_font_size = 19
+	var surface := Color("303747") if is_dark() else Color("f0f1f5")
+	var pressed := Color("495366") if is_dark() else Color("e2e6ed")
 	for state in ["normal","hover","pressed","focus","disabled"]:
-		var color := Color("294d49") if state=="normal" else Color("396864")
-		result.set_stylebox(state,"Button",style(color,Color("56786c"),9,1))
-	result.set_color("font_color","Label",PAPER)
-	result.set_color("font_color","Button",PAPER)
-	result.set_color("font_color","LineEdit",PAPER)
-	result.set_stylebox("normal","LineEdit",style(Color("203e3a"),GOLD,8,1))
+		var fill := surface if state in ["normal","disabled"] else pressed
+		result.set_stylebox(state,"Button",style(fill,Color.TRANSPARENT,12))
+		result.set_stylebox(state,"OptionButton",style(fill,Color.TRANSPARENT,10))
+	for kind in ["Label","Button","LineEdit","OptionButton","CheckButton"]:
+		result.set_color("font_color",kind,foreground())
+		result.set_color("font_hover_color",kind,foreground())
+		result.set_color("font_pressed_color",kind,foreground())
+	result.set_color("caret_color","LineEdit",foreground())
+	result.set_color("font_placeholder_color","LineEdit",Color("9499a4") if is_dark() else Color("747985"))
+	result.set_stylebox("normal","LineEdit",style(surface,Color.TRANSPARENT,10))
+	result.set_stylebox("focus","LineEdit",style(surface,accent(),10,2))
+	result.set_stylebox("scroll","VScrollBar",StyleBoxEmpty.new())
+	result.set_stylebox("grabber","VScrollBar",style(Color(0.5,0.5,0.55,0.5),Color.TRANSPARENT,4))
 	return result
 
 func style(color: Color,border: Color, radius: int, width: int = 0) -> StyleBoxFlat:
@@ -141,7 +186,7 @@ func close() -> void:
 	game.s.save_game()
 
 func alt_size() -> Vector2:
-	return Vector2(680,474) if size.x > size.y*1.24 else Vector2(430,760)
+	return Vector2(430,850)
 
 func step(delta: float, allow_notice: bool) -> void:
 	progress = move_toward(progress,1.0 if shown else 0.0,delta*6.5)
@@ -156,7 +201,7 @@ func step(delta: float, allow_notice: bool) -> void:
 		handset.position = (size-shell*handset.scale)*0.5 + Vector2(shake,(1-eased)*70*s)
 		handset.modulate.a = eased
 		if is_instance_valid(status):
-			status.text = "%02d:00   ·   DÍA %d" % [game.s.clock_hour(),game.s.day]
+			status.text = "%02d:00" % game.s.clock_hour()
 		queue_redraw()
 	if shown and at=="clock":
 		for key in timer_labels:
@@ -194,7 +239,7 @@ func step(delta: float, allow_notice: bool) -> void:
 		build_if("calls")
 
 func _draw() -> void:
-	if progress>0: draw_rect(Rect2(Vector2.ZERO,size),Color(0.025,0.065,0.06,progress*0.74))
+	if progress>0: draw_rect(Rect2(Vector2.ZERO,size),Color(0.015,0.018,0.025,progress*0.66))
 
 func navigate(app: String, item: String = "", remember: bool = true) -> void:
 	routes.go(app,item,remember)
@@ -224,6 +269,14 @@ func button(parent: Control, caption: String, command: Callable, height: float =
 	node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	node.pressed.connect(command)
 	parent.add_child(node)
+	var primary := caption.begins_with("Enviar") or caption.begins_with("Guardar") or caption in ["Redactar","Crear perfil","Compartir","Comentar","Responder","Colgar","Confirmar borrado"]
+	if primary:
+		var fill := Color("dc434b") if caption in ["Colgar","Confirmar borrado"] else accent()
+		if caption=="Responder": fill = Color("24a452")
+		for state in ["normal","hover","pressed","focus"]:
+			node.add_theme_stylebox_override(state,style(fill if state=="normal" else fill.darkened(0.1),Color.TRANSPARENT,13))
+		for state in ["font_color","font_hover_color","font_pressed_color","font_focus_color"]:
+			node.add_theme_color_override(state,Color.WHITE)
 	return node
 
 func row(parent: Control) -> HBoxContainer:
@@ -237,7 +290,7 @@ func label(parent: Control, copy: String, fs: int = 19, tint: Color = PAPER) -> 
 	node.text = copy
 	node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	node.add_theme_font_size_override("font_size",fs)
-	node.add_theme_color_override("font_color",tint)
+	node.add_theme_color_override("font_color",foreground() if tint==PAPER else (accent() if tint==GOLD else tint))
 	parent.add_child(node)
 	return node
 
@@ -264,34 +317,53 @@ func rebuild() -> void:
 		handset.remove_child(child)
 		child.queue_free()
 	handset.size = alt_size()
+	theme = make_theme()
 	handset.queue_redraw()
 	var margin := MarginContainer.new()
 	handset.add_child(margin)
-	margin.position = Vector2(18,18)
-	margin.size = handset.size - Vector2(36,36)
+	margin.position = Vector2(25,20)
+	margin.size = handset.size - Vector2(50,52)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation",8)
 	margin.add_child(column)
 	var status_row := row(column)
-	status = label(status_row,"%02d:00   ·   DÍA %d"%[game.s.clock_hour(),game.s.day],17,GOLD)
+	status = label(status_row,"%02d:00"%game.s.clock_hour(),17,foreground())
 	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.custom_minimum_size.y = 29
 	signals = Control.new()
 	var indicator := signals
-	indicator.custom_minimum_size = Vector2(69,20)
+	indicator.custom_minimum_size = Vector2(79,29)
 	status_row.add_child(indicator)
 	indicator.draw.connect(func():
 		var capacity: float = int(phone.data.settings.get("battery",100))/100.0
-		for i in range(3):
-			var height := 5+i*4
-			indicator.draw_rect(Rect2(2+i*7,16-height,5,height),GOLD)
-		indicator.draw_rect(Rect2(28,4,33,13),GOLD,false,2)
-		indicator.draw_rect(Rect2(62,8,3,5),GOLD)
-		indicator.draw_rect(Rect2(31,7,27*capacity,7),GOLD))
+		var ink := foreground()
+		for i in range(4):
+			var height := 4+i*3
+			indicator.draw_style_box(style(ink,Color.TRANSPARENT,1),Rect2(2+i*4,19-height,3,height))
+		for radius in [9,6,3]: indicator.draw_arc(Vector2(30,19),radius,PI*1.17,PI*1.83,15,ink,1.5,true)
+		indicator.draw_style_box(style(Color.TRANSPARENT,ink,4,1),Rect2(43,6,31,14))
+		indicator.draw_rect(Rect2(75,10,2,6),ink)
+		indicator.draw_style_box(style(ink,Color.TRANSPARENT,2),Rect2(46,9,25*capacity,8)))
 	var nav := row(column)
-	button(nav,"‹ Atrás",back,44)
-	button(nav,"Inicio",home,44)
-	button(nav,"Cerrar",close,44)
-	label(column,NAMES.get(at,at),24,GOLD)
+	if at!="home":
+		var previous := button(nav,"‹ Atrás",back,38)
+		previous.add_theme_color_override("font_color",accent())
+		previous.add_theme_stylebox_override("normal",StyleBoxEmpty.new())
+		var go_home := button(nav,"⌂",home,38)
+		go_home.tooltip_text = "Pantalla de inicio"
+		go_home.add_theme_stylebox_override("normal",StyleBoxEmpty.new())
+	else:
+		var breathing_space := Control.new()
+		breathing_space.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		nav.add_child(breathing_space)
+	var dismiss := button(nav,"×",close,38)
+	dismiss.size_flags_horizontal = Control.SIZE_SHRINK_END
+	dismiss.custom_minimum_size.x = 42
+	dismiss.tooltip_text = "Cerrar teléfono"
+	dismiss.add_theme_stylebox_override("normal",style(Color(0.5,0.5,0.55,0.16),Color.TRANSPARENT,19))
+	if at!="home":
+		var heading := label(column,NAMES.get(at,at),30,foreground())
+		heading.add_theme_constant_override("line_spacing",1)
 	scroll = ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -308,7 +380,10 @@ func rebuild() -> void:
 		"mail": draw_mail()
 		"camera": draw_camera()
 		"gallery": draw_gallery()
-		"social": draw_social()
+		"social":
+			draw_social()
+			if target.is_empty() and (not game.network_assignment_active() or phone.data.profile.get("configured",false)):
+				draw_social_navigation(column)
 		"files": draw_files()
 		"notes": draw_notes()
 		"map": draw_map()
@@ -319,38 +394,107 @@ func rebuild() -> void:
 		"attachment": draw_attachment()
 	switching = false
 
+func app_icon(parent: Control, id: String, title: String, dock: bool = false) -> void:
+	var icon := Icon.new()
+	icon.app = id
+	icon.caption = "" if dock else title
+	icon.tooltip_text = title
+	icon.icon_size = 56.0 if dock else 61.0
+	icon.custom_minimum_size = Vector2(79,68 if dock else 89)
+	icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	icon.pressed.connect(func(): navigate(id))
+	for state in ["normal","hover","pressed","focus"]:
+		icon.add_theme_stylebox_override(state,StyleBoxEmpty.new())
+	parent.add_child(icon)
+
 func draw_home(column: VBoxContainer) -> void:
 	if not is_instance_valid(content): return
-	var wallpaper := PanelContainer.new()
-	wallpaper.add_theme_stylebox_override("panel",style(Color(0.15,0.27,0.24,0.77),Color("608375"),20,1))
-	content.add_child(wallpaper)
+	var welcome := label(content,"Día %d · Acampada València"%game.s.day,21,Color.WHITE)
+	welcome.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	welcome.custom_minimum_size.y = 47
 	var grid := GridContainer.new()
-	grid.columns = 4 if alt_size().x>500 else 3
-	grid.add_theme_constant_override("h_separation",8)
-	grid.add_theme_constant_override("v_separation",8)
-	wallpaper.add_child(grid)
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation",9)
+	grid.add_theme_constant_override("v_separation",16)
+	content.add_child(grid)
 	for app in APPS:
-		var id: String = app[0]
-		var icon := Icon.new()
-		icon.app = id
-		icon.caption = app[1]
-		icon.tooltip_text = app[1]
-		icon.tint = Color(app[3]).darkened(0.12)
-		icon.custom_minimum_size = Vector2(86,75 if alt_size().x>500 else 80)
-		icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		icon.pressed.connect(func(): navigate(id))
-		for state in ["normal","hover","pressed","focus"]:
-			icon.add_theme_stylebox_override(state,StyleBoxEmpty.new())
-		grid.add_child(icon)
-	var dock := row(column)
-	button(dock,"Llamadas",func(): navigate("calls"))
-	button(dock,"Avisos · %d"%phone.unread(),func(): navigate("notices"))
+		app_icon(grid,app[0],app[1])
+	var hint := label(content,"Desliza para consultar tus aplicaciones",14,Color("dce9ff"))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var dock := PanelContainer.new()
+	dock.add_theme_stylebox_override("panel",style(Color(0.83,0.88,0.98,0.22),Color(1,1,1,0.15),25,1))
+	column.add_child(dock)
+	var shortcuts := HBoxContainer.new()
+	shortcuts.add_theme_constant_override("separation",6)
+	dock.add_child(shortcuts)
+	app_icon(shortcuts,"calls","Teléfono",true)
+	app_icon(shortcuts,"messages","Mensajes",true)
+	app_icon(shortcuts,"camera","Cámara",true)
+	app_icon(shortcuts,"notices","Avisos · %d"%phone.unread(),true)
+
+func section_title(parent: Control, title: String) -> void:
+	label(parent,title,15,Color("8e93a0") if is_dark() else Color("666b77"))
+
+func list_entry(parent: Control, headline: String, detail: String, command: Callable, image_key: String = "", unread: bool = false) -> void:
+	var shell := PanelContainer.new()
+	shell.add_theme_stylebox_override("panel",style(Color("303747") if is_dark() else Color("f3f4f8"),Color.TRANSPARENT,13))
+	parent.add_child(shell)
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation",10)
+	shell.add_child(line)
+	var avatar := PanelContainer.new()
+	avatar.custom_minimum_size = Vector2(46,46)
+	avatar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	avatar.add_theme_stylebox_override("panel",style(Color("8192b1") if image_key.is_empty() else Color("e3e7ee"),Color.TRANSPARENT,23))
+	line.add_child(avatar)
+	if image_key.is_empty():
+		var initial := label(avatar,headline.substr(0,1).to_upper(),22,Color.WHITE)
+		initial.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		initial.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	elif phone.data.contacts.has(image_key):
+		var face := TextureRect.new()
+		face.texture = game.World.CROWD_TEXTURES[int(phone.data.contacts[image_key].sprite)]
+		face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		face.custom_minimum_size = Vector2(40,42)
+		avatar.add_child(face)
+	var body := VBoxContainer.new()
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation",2)
+	line.add_child(body)
+	var main_label := label(body,("• " if unread else "")+headline,20,foreground())
+	main_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if not detail.is_empty(): label(body,detail,15,Color("b8bdca") if is_dark() else Color("6c7180"))
+	var arrow := label(line,"›",27,accent())
+	arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	arrow.custom_minimum_size.x = 24
+	# A standard button handles touch, keyboard focus and ScrollContainer cancellation.
+	var touch := button(shell,"",command,46)
+	touch.tooltip_text = headline
+	for state in ["normal","hover","pressed","focus"]:
+		touch.add_theme_stylebox_override(state,StyleBoxEmpty.new())
+	touch.add_theme_stylebox_override("focus",style(Color.TRANSPARENT,accent(),10,2))
+
 
 func draw_contacts() -> void:
 	if target.is_empty():
-		if phone.data.contacts.is_empty(): label(content,"La agenda está vacía. Habla con alguien en la plaza para intercambiar números.")
-		for who in phone.data.contacts:
-			button(content,who+" · "+phone.data.contacts[who].commission,func(): navigate("contacts",who))
+		section_title(content,"TODOS LOS CONTACTOS · %d"%phone.data.contacts.size())
+		if phone.data.contacts.is_empty():
+			label(content,"Sin contactos",25)
+			label(content,"Habla con alguien en la plaza para intercambiar números.",17,Color("747985"))
+		var search := LineEdit.new()
+		search.placeholder_text = "Buscar contactos"
+		search.custom_minimum_size.y = 42
+		content.add_child(search)
+		var results := VBoxContainer.new()
+		content.add_child(results)
+		var names: Array = phone.data.contacts.keys()
+		names.sort()
+		for who in names:
+			list_entry(results,who,phone.data.contacts[who].commission,func(): navigate("contacts",who),who)
+		search.text_changed.connect(func(query):
+			for i in range(names.size()):
+				results.get_child(i).visible = str(names[i]).to_lower().contains(query.to_lower()))
 		return
 	var person: Dictionary = phone.data.contacts.get(target,{})
 	if person.is_empty(): return
@@ -381,7 +525,7 @@ func draw_messages() -> void:
 			var item: Dictionary = phone.data.threads[key]
 			if item.app != app: continue
 			found = true
-			button(content,item.title+" · "+str(item.items.size()),func(): navigate(app,key))
+			list_entry(content,item.title,str(item.items.size())+" mensajes",func(): navigate(app,key))
 		if not found: label(content,"Todavía no hay conversaciones.")
 		return
 	var key := target
@@ -396,12 +540,23 @@ func draw_messages() -> void:
 	for i in range(items.size()-1,-1,-1):
 		var item: Dictionary = items[i]
 		var bubble := PanelContainer.new()
-		bubble.add_theme_stylebox_override("panel",style(Color("34625a") if item.by=="Tú" else Color("254340"),Color("5b7769"),9,1))
-		content.add_child(bubble)
+		var outgoing: bool = item.by=="Tú"
+		var bubble_row := row(content)
+		if outgoing:
+			var spacer := Control.new()
+			spacer.custom_minimum_size.x = 45
+			bubble_row.add_child(spacer)
+		bubble.add_theme_stylebox_override("panel",style(Color("1779eb") if outgoing else Color("e9e9ef"),Color.TRANSPARENT,18))
+		bubble.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bubble_row.add_child(bubble)
+		if not outgoing:
+			var spacer := Control.new()
+			spacer.custom_minimum_size.x = 45
+			bubble_row.add_child(spacer)
 		var col := VBoxContainer.new()
 		bubble.add_child(col)
-		label(col,item.by,16,GOLD)
-		label(col,item.body,17)
+		label(col,item.by,14,Color("dceeff") if outgoing else Color("656977"))
+		label(col,item.body,18,Color.WHITE if outgoing else Color("242631"))
 		if not item.attachment.is_empty(): button(col,"Abrir adjunto",func(): navigate("attachment",item.attachment),43)
 
 func draw_mail() -> void:
@@ -461,11 +616,22 @@ func draw_mail() -> void:
 		if phone.data.drafts.has("mail"): button(content,"Reabrir borrador",func(): navigate("mail","new"))
 		else: label(content,"Sin borradores.")
 		return
+	var search := LineEdit.new()
+	search.placeholder_text = "Buscar en el correo"
+	search.custom_minimum_size.y = 46
+	content.add_child(search)
+	var results := VBoxContainer.new()
+	content.add_child(results)
+	var searchable: Array[String] = []
 	var count := 0
 	for item in phone.data.mail:
 		if item.out != (letter_tab=="out"): continue
 		count += 1
-		button(content,("• " if not item.read else "")+item.subject+" · "+item.by,func(): navigate("mail","read:"+item.id))
+		searchable.append((str(item.subject)+" "+str(item.by)+" "+str(item.body)).to_lower())
+		list_entry(results,item.subject,item.by+" · "+str(item.body).left(48),func(): navigate("mail","read:"+item.id),"",not item.read)
+	search.text_changed.connect(func(query):
+		for i in range(searchable.size()):
+			results.get_child(i).visible = searchable[i].contains(query.to_lower()))
 	if count==0: label(content,"Esta bandeja está vacía.")
 
 func draw_attachment_picker() -> void:
@@ -521,7 +687,7 @@ func draw_camera() -> void:
 	view = TextureRect.new()
 	view.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	view.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	view.custom_minimum_size.y = 221 if alt_size().x<500 else 178
+	view.custom_minimum_size.y = 286
 	view.mouse_filter = Control.MOUSE_FILTER_STOP
 	view.gui_input.connect(func(event):
 		if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT):
@@ -548,7 +714,11 @@ func draw_camera() -> void:
 	button(tools,"Zoom %s×"%[["1","1,4","1,8"][zoom]],func():
 		zoom = (zoom+1)%3
 		rebuild())
-	button(tools,"Disparar",capture_photo)
+	var shutter := button(tools,"●",capture_photo,66)
+	shutter.tooltip_text = "Disparar"
+	shutter.add_theme_font_size_override("font_size",38)
+	for state in ["normal","hover","pressed","focus"]:
+		shutter.add_theme_stylebox_override(state,style(Color("25262b"),Color.WHITE,32,3))
 	button(content,"Abrir galería",func(): navigate("gallery"))
 
 func image_widget(parent: Control, key: String, height: float = 220) -> void:
@@ -578,19 +748,21 @@ func draw_gallery() -> void:
 		button(content,"Abrir cámara",func(): navigate("camera"))
 		if phone.data.photos.is_empty():
 			label(content,"Aún no hay fotografías.")
-		var strip := ScrollContainer.new()
-		strip.custom_minimum_size.y = 150
-		strip.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		content.add_child(strip)
-		var line := row(strip)
+		section_title(content,"BIBLIOTECA · %d"%phone.data.photos.size())
+		var tiles := GridContainer.new()
+		tiles.columns = 3
+		tiles.add_theme_constant_override("h_separation",5)
+		tiles.add_theme_constant_override("v_separation",8)
+		content.add_child(tiles)
 		for photo in phone.data.photos:
 			var tile := VBoxContainer.new()
-			tile.custom_minimum_size.x = 130
-			line.add_child(tile)
+			tile.custom_minimum_size.x = 116
+			tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			tiles.add_child(tile)
 			image_widget(tile,photo.id,95)
 			var name := "Foto "+str(photo.id)
 			if photo.has("subject"): name = Photo.SUBJECTS[photo.subject]
-			button(tile,name,func(): navigate("gallery",photo.id),44)
+			button(tile,name,func(): navigate("gallery",photo.id),40)
 		return
 	var source: Array = phone.data.photos.filter(func(item): return item.id==key)
 	if source.is_empty(): return
@@ -638,21 +810,22 @@ func draw_social() -> void:
 			social_tab = "stories" if is_story else "profile"
 			navigate("social","",false),"Compartir")
 		return
-	var tabs := row(content)
-	for tab in [["feed","Feed"],["profile","Perfil"],["stories","Historias"],["direct","MD"]]:
-		var key: String = tab[0]
-		button(tabs,tab[1],func():
-			if key=="direct": navigate("direct")
-			else:
-				social_tab = key
-				navigate("social","",false),43)
 	if social_tab=="profile":
-		label(content,phone.data.profile.get("name","@acampadavalencia"),23,GOLD)
+		label(content,phone.data.profile.get("name","@acampadavalencia"),23,foreground())
+		var header := row(content)
 		if phone.data.profile.get("configured",false):
-			draw_profile_avatar(content,phone.data.profile.get("avatar",""))
+			var avatar_col := VBoxContainer.new()
+			avatar_col.custom_minimum_size.x = 92
+			header.add_child(avatar_col)
+			draw_profile_avatar(avatar_col,phone.data.profile.get("avatar",""))
+		var stats := VBoxContainer.new()
+		stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		header.add_child(stats)
+		label(stats,"%d publicaciones"%(phone.data.social.size()+game.s.posts.size()),20,foreground())
+		label(stats,"%d seguidores"%phone.data.followers.size(),20,foreground())
+		if phone.data.profile.get("configured",false):
 			label(content,phone.data.profile.bio,17)
 			button(content,"Editar perfil",func(): navigate("social","account"),43)
-		label(content,"%d seguidores · %d publicaciones"% [phone.data.followers.size(),phone.data.social.size()+game.s.posts.size()],16)
 		for name in phone.data.followers: label(content,name,15)
 	if social_tab=="stories":
 		if phone.data.stories.is_empty(): label(content,"Ninguna historia publicada.")
@@ -674,6 +847,20 @@ func draw_social() -> void:
 		if not target.is_empty() and target!=entry.id: continue
 		social_card(entry,false)
 	if phone.data.social.is_empty() and game.s.posts.is_empty(): label(content,"El perfil aún no tiene publicaciones.")
+
+func draw_social_navigation(parent: Control) -> void:
+	var bar := row(parent)
+	for entry in [["feed","Inicio"],["stories","Historias"],["publish","＋"],["direct","MD"],["profile","Perfil"]]:
+		var key: String = entry[0]
+		var tab := button(bar,entry[1],func():
+			if key=="direct": navigate("direct")
+			elif key=="publish": navigate("gallery")
+			else:
+				social_tab = key
+				navigate("social","",false),44)
+		tab.add_theme_font_size_override("font_size",14 if key!="publish" else 23)
+		tab.add_theme_color_override("font_color",accent() if key==social_tab else foreground())
+		tab.add_theme_stylebox_override("normal",StyleBoxEmpty.new())
 
 func draw_profile_avatar(parent: Control, avatar: String) -> void:
 	if avatar=="camp-logo":
@@ -770,7 +957,7 @@ func draw_notes() -> void:
 	if key.is_empty():
 		button(content,"Nueva nota",func(): navigate("notes","new"))
 		for note in phone.data.notes:
-			button(content,note.body,func(): navigate("notes",note.id))
+			list_entry(content,note.body.left(45),"Nota guardada",func(): navigate("notes",note.id))
 		if phone.data.notes.is_empty(): label(content,"Aún no has escrito notas.")
 		return
 	var original := ""
@@ -791,7 +978,7 @@ func draw_files() -> void:
 		return
 	if target.is_empty():
 		for key in phone.data.files:
-			button(content,phone.data.files[key].title,func(): navigate("files",key))
+			list_entry(content,phone.data.files[key].title,"Documento",func(): navigate("files",key))
 		if phone.data.files.is_empty(): label(content,"No se han recibido documentos.")
 		return
 	var ref := target
@@ -824,7 +1011,7 @@ func draw_map() -> void:
 			var place: Dictionary = locations[i]
 			var mark := frame.position + Vector2(place.pos)*width/1280.0
 			chart.draw_circle(mark,9,INK)
-			chart.draw_string(FONTS,mark+Vector2(-5,5),str(i+1),HORIZONTAL_ALIGNMENT_LEFT,-1,13,GOLD))
+			chart.draw_string(FONTS,mark+Vector2(-5,5),str(i+1),HORIZONTAL_ALIGNMENT_LEFT,-1,13,Color.WHITE))
 	for i in range(locations.size()):
 		label(content,"%d · %s"%[i+1,locations[i].label],17)
 	button(content,"Abrir mapa de la plaza",func():
@@ -911,8 +1098,18 @@ func finish_call(outcome: String) -> void:
 
 func draw_calls() -> void:
 	if not call_state.is_empty():
-		label(content,call_name,30,GOLD)
-		label(content,call_state,22)
+		var portrait := PanelContainer.new()
+		portrait.custom_minimum_size = Vector2(118,118)
+		portrait.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		portrait.add_theme_stylebox_override("panel",style(Color("526781"),Color.TRANSPARENT,59))
+		content.add_child(portrait)
+		var face := label(portrait,call_name.left(1).to_upper(),54,Color.WHITE)
+		face.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		face.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var caller := label(content,call_name,36,foreground())
+		caller.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var state_label := label(content,call_state,21,foreground())
+		state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		if call_state=="Entrante":
 			button(content,"Responder",func():
 				call_state = "En llamada"
@@ -924,7 +1121,7 @@ func draw_calls() -> void:
 		if call_state!="Finalizada":
 			button(content,"Colgar",func(): finish_call("Rechazada" if call_state=="Entrante" else "Finalizada"))
 	for who in phone.data.contacts:
-		button(content,"Llamar a "+who,func(): start_call(who,false))
+		list_entry(content,who,"Llamar",func(): start_call(who,false),who)
 	for call in phone.data.calls:
 		label(content,("%s · %s · %s"%[call.name,"Entrante" if call.incoming else "Saliente",call.outcome]),17)
 	if phone.data.contacts.is_empty(): label(content,"Consigue un contacto en la plaza para llamar.")

@@ -110,41 +110,26 @@ func scene(game: Control) -> void:
 	backdrop(game,Vector2(375,455),Color(0.22,0.3,0.22,0.5))
 	game.draw_rect(Rect2(25,103,296,285),Color("a87953"))
 	game.draw_rect(Rect2(31,110,282,273),Color("c99b67"),false,3)
-	# Stylised felt patient on a wooden operation board, with abstract tokens.
-	game.draw_rect(Rect2(32,113,282,265),Color("8f6547"),false,2)
-	for p in [Vector2(38,118),Vector2(304,118),Vector2(38,372),Vector2(304,372)]:
-		game.draw_rect(Rect2(p-Vector2(3,3),Vector2(6,6)),Color("dbbb8a"))
-		game.draw_line(p-Vector2(2,0),p+Vector2(2,0),INK,1)
-	game.draw_circle(Vector2(71,238),34,Color("88b2a4"))
-	game.draw_rect(Rect2(93,169,153,140),Color("6c9f91"))
-	game.draw_rect(Rect2(129,137,78,204),Color("6c9f91"))
-	for y in [179,261]:
-		game.draw_rect(Rect2(233,y,63,39),Color("6c9f91"))
-		game.draw_rect(Rect2(277,y+4,16,31),Color("8bb4a4"))
-	for p in [Vector2(120,180),Vector2(208,180),Vector2(120,298),Vector2(208,298)]:
-		game.draw_rect(Rect2(p,Vector2(6,6)),Color("9ec4af"))
-	game.draw_rect(Rect2(43,228,7,5),INK)
-	game.draw_rect(Rect2(43,245,7,5),INK)
-	game.draw_rect(TRAY,Color("779396"))
-	game.draw_rect(TRAY.grow(-5),Color("334f51"),false,3)
-	for i in range(7):
-		game.draw_line(Vector2(340,177+i*22),Vector2(400,177+i*22),Color("658387"),1)
+	game.draw_texture_rect(preload("res://assets/art_v2/patient.png"), Rect2(32,154,282,171), false)
+	game.draw_texture_rect(preload("res://assets/art_v2/tray.png"), TRAY, false)
+
 	game.text(TRAY.position+Vector2(0,19),"BANDEJA",12,CREAM,true,TRAY.size.x,HORIZONTAL_ALIGNMENT_CENTER)
 	for i in range(stage):
 		game.draw_rect(Rect2(340+(i%2)*24,317+i/2*10,12,8),GOLD)
 	if not path.is_empty():
-		var c := RED if clock<collision_until else Color("394451")
+		var c := RED if clock<collision_until else Color("262d34")
+		# Rounded recessed cavity: outer rim, bevel and inner wall. The playable width stays unchanged.
+		for edge in range(1,path.size()):
+			game.draw_line(path[edge-1]+Vector2(0,2),path[edge]+Vector2(0,2),Color("53392b"),HALF_WIDTH[stage]*2+6,true)
+			game.draw_circle(path[edge-1]+Vector2(0,2),HALF_WIDTH[stage]+3,Color("53392b"))
+		game.draw_circle(path[-1]+Vector2(0,2),HALF_WIDTH[stage]+3,Color("53392b"))
 		for i in range(1,path.size()):
 			game.draw_line(path[i-1],path[i],c,HALF_WIDTH[stage]*2)
 			game.draw_circle(path[i-1],HALF_WIDTH[stage],c)
 		game.draw_circle(path[-1],HALF_WIDTH[stage],c)
 		var radius: float = PIECES[stage]
-		var corners := 3+stage%4
-		var outline := PackedVector2Array()
-		for i in range(corners): outline.append(piece+Vector2.from_angle(i*TAU/corners-PI/2)*radius)
-		game.draw_colored_polygon(outline,GOLD)
-		game.draw_circle(piece,3,CREAM)
+		item(game, preload("res://assets/art_v2/bone.png"), piece, Vector2(radius*2,radius*1.5))
 	if not report:
-		var pinch := 2.0 if closed else 8.0
-		game.draw_line(tip+Vector2(-26,-42),tip+Vector2(-pinch,1),Color("cfdbda"),4)
-		game.draw_line(tip+Vector2(26,-42),tip+Vector2(pinch,1),Color("a3bdc3"),4)
+		var tool := preload("res://assets/art_v2/tweezers_closed.png") if closed else preload("res://assets/art_v2/tweezers_open.png")
+		var width := 18.0 if closed else 36.0
+		game.draw_texture_rect(tool,Rect2(tip-Vector2(width/2,60),Vector2(width,60)),false)

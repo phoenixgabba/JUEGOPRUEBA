@@ -1,5 +1,9 @@
 extends "res://scripts/camp/activities_two/session.gd"
 
+const CABINET := preload("res://assets/visual/arcade_board.png")
+const HOLE_BACK := preload("res://assets/visual/hole_back.png")
+const HOLE_FRONT := preload("res://assets/visual/hole_front.png")
+
 const SLOTS := [Vector2(76,172),Vector2(219,172),Vector2(362,172),Vector2(76,273),Vector2(219,273),Vector2(362,273),Vector2(76,373),Vector2(219,373),Vector2(362,373)]
 const LABELS := ["AVISO NEONAZI", "VECINA MAYOR", "MENOR", "VISITANTE"]
 var slots: Dictionary = {}
@@ -74,22 +78,23 @@ func status() -> String:
 	return "%d/15 alertas    •    %d errores    •    %.1f s"%[correct,mistakes,active_time]
 
 func scene(game: Control) -> void:
-	backdrop(game,Vector2(710,450),Color(0.15,0.21,0.15,0.12))
+	game.draw_texture_rect(CABINET,VIEW,false)
 	for i in range(SLOTS.size()):
 		var p: Vector2 = SLOTS[i]
 		var bay := Rect2(p-Vector2(57,71),Vector2(114,94))
-		game.draw_rect(bay,Color(INK,0.74))
-		game.draw_rect(bay,Color("8c8b6d"),false,2)
-		item(game,game.World.TABLE,p+Vector2(0,6),Vector2(63,31))
+		var hole := Rect2(p-Vector2(57,30),Vector2(114,54))
+		game.draw_texture_rect(HOLE_BACK,hole,false)
 		if flash.has(i) and clock<flash[i].until:
-			game.draw_rect(bay,Color(GREEN if flash[i].good else RED,0.65),false,4)
+			game.draw_arc(p-Vector2(0,5),43,0,TAU,32,Color(GREEN if flash[i].good else RED,0.85),3)
 		if not slots.has(i):
+			game.draw_texture_rect(HOLE_FRONT,hole,false)
 			game.text(p+Vector2(-52,12),str(i+1),13,CREAM)
 			continue
 		var entry: Dictionary = slots[i]
 		var reveal := clampf(minf(clock-entry.born,entry.until-clock)*7,0,1)
 		var stature := 0.8 if entry.role==2 else 1.0
-		actor(game,p-Vector2(0,10*reveal),entry.sprite,(0.58+0.30*reveal)*stature,true)
+		actor(game,p+Vector2(0,12-20*reveal),entry.sprite,(0.58+0.30*reveal)*stature,true)
+		game.draw_texture_rect(HOLE_FRONT,hole,false)
 		if entry.role==1:
 			game.draw_line(p+Vector2(11,-24),p+Vector2(14,-10),Color("c5a46a"),2)
 		var tag := Rect2(p-Vector2(55,1),Vector2(110,22))
